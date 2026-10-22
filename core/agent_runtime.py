@@ -1,12 +1,11 @@
 """
 Agent runtime: LLM + tools (filesystem, shell, remote, power).
-Works with litellm / OpenAI-compatible API.
+Supports role-specific system prompts and tool allow-lists.
 """
 
 from __future__ import annotations
 
 import json
-import os
 import re
 from typing import Any, Callable, Optional
 
@@ -16,41 +15,16 @@ from tools.remote import RemoteManager, RemoteDevice
 from tools.power import PowerManager
 
 
-SYSTEM_PROMPT = """Ты локальный агент-разработчик на компьютере пользователя (как Claude Code).
+DEFAULT_SYSTEM = """Ты локальный агент-разработчик на компьютере пользователя (как Claude Code).
 
 У тебя есть инструменты. Чтобы вызвать инструмент, выведи РОВНО один блок:
 
 ```tool
-{"name": "ИМЯ_ИНСТРУМЕНТА", "args": {...}}
+{\"name\": \"ИМЯ_ИНСТРУМЕНТА\", \"args\": {...}}
 ```
 
-Доступные инструменты:
-
-1. list_dir — {"path": "."}
-2. read_file — {"path": "file.py"}
-3. write_file — {"path": "file.py", "content": "..."}  (перед записью делается backup)
-4. append_file — {"path": "file.py", "content": "..."}
-5. delete_path — {"path": "file.py"}  (с backup)
-6. move_path — {"src": "a", "dst": "b"}
-7. copy_path — {"src": "a", "dst": "b"}
-8. search_text — {"pattern": "foo", "path": "."}
-9. run_shell — {"command": "ls -la", "cwd": null}
-10. remote_list — {}
-11. remote_add — {"name": "pi", "host": "192.168.1.10", "user": "pi", "port": 22, "key_path": null}
-12. remote_run — {"name": "pi", "command": "uptime"}
-13. remote_ping — {"name": "pi"}
-14. power_status — {}
-15. power_start — {"mode": "system"}  // system | display
-16. power_stop — {}
-17. finish — {"summary": "что сделано"}
-
-Правила:
-- Работай только внутри workspace, если не сказано иное.
-- Перед удалением/перезаписью система сама делает backup.
-- Опасные shell-команды блокируются.
-- После finish задача считается завершённой.
-- Отвечай на русском, кратко объясняй шаги.
-- За один ответ вызывай один инструмент (или finish).
+Доступные инструменты перечислены ниже. После finish задача считается завершённой.
+Отвечай на русском, кратко объясняй шаги. За один ответ — один инструмент (или finish).
 """
 
 
@@ -66,6 +40,9 @@ class AgentRuntime:
         max_steps: int = 40,
         shell_timeout: int = 120,
         log_fn: Optional[Callable[[str], None]] = None,
+        system_prompt: Optional[str] = None,
+        allowed_tools: Optional[list[str]] = None,
+        role_name: str = "agent",
     ):
         self.fs = WorkspaceFS(workspace, backup_dir)
         self.shell = ShellRunner(cwd=workspace, timeout=shell_timeout)
@@ -77,8 +54,10 @@ class AgentRuntime:
         self.temperature = temperature
         self.max_steps = max_steps
         self.log = log_fn or (lambda s: None)
+        self.role_name = role_name
         self.history: list[dict] = []
-        self._tools = {
+
+        all_tools: dict[str, Callable] = {
             "list_dir": lambda a: self.fs.list_dir(a.get("path", ".")),
             "read_file": lambda a: self.fs.read_file(a["path"]),
             "write_file": lambda a: self.fs.write_file(a["path"], a["content"]),
@@ -107,6 +86,22 @@ class AgentRuntime:
             "finish": lambda a: a.get("summary", "Done"),
         }
 
+        if allowed_tools is None:
+            self._tools = all_tools
+        else:
+            names = set(allowed_tools) | {"finish"}
+            self._tools = {k: v for k, v in all_tools.items() if k in names}
+
+        tool_list = "\n".join(f"- {n}" for n in self._tools if n != "finish")
+        tool_list += "\n- finish — {\"summary\": \"...\"}"
+
+        base = system_prompt or DEFAULT_SYSTEM
+        self.system_prompt = (
+            base.strip()
+            + "\n\nФормат вызова инструмента:\n```tool\n{\"name\": \"...\", \"args\": {...}}\n```\n"
+            + f"\nДоступные инструменты:\n{tool_list}\n"
+        )
+
     def _llm(self, messages: list[dict]) -> str:
         try:
             from litellm import completion
@@ -127,14 +122,12 @@ class AgentRuntime:
         return resp.choices[0].message.content or ""
 
     def _parse_tool(self, text: str) -> Optional[dict]:
-        # ```tool ... ```
         m = re.search(r"```tool\s*(\{.*?\})\s*```", text, re.DOTALL)
         if m:
             try:
                 return json.loads(m.group(1))
             except json.JSONDecodeError:
                 pass
-        # bare json with name
         m = re.search(r"\{[^{}]*\"name\"\s*:\s*\"[^\"]+\"[^{}]*\}", text, re.DOTALL)
         if m:
             try:
@@ -143,22 +136,23 @@ class AgentRuntime:
                 pass
         return None
 
-    def run(self, task: str) -> str:
-        self.history = [
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {
-                "role": "user",
-                "content": (
-                    f"Задача:\n{task}\n\n"
-                    f"Workspace: {self.fs.root}\n"
-                    f"Начни работу. Сначала при необходимости осмотри файлы."
-                ),
-            },
-        ]
-        final_parts = []
+    def run(self, task: str, context: str = "") -> str:
+        user_content = f"Задача:\n{task}\n\nWorkspace: {self.fs.root}\n"
+        if context:
+            user_content += f"\n--- Контекст от предыдущих агентов ---\n{context}\n"
+        user_content += "\nНачни работу. Если инструментов нет — сразу finish с итогом."
 
-        for step in range(1, self.max_steps + 1):
-            self.log(f"--- шаг {step}/{self.max_steps} ---")
+        self.history = [
+            {"role": "system", "content": self.system_prompt},
+            {"role": "user", "content": user_content},
+        ]
+        final_parts: list[str] = []
+
+        only_finish = set(self._tools.keys()) <= {"finish"}
+        max_steps = 1 if only_finish else self.max_steps
+
+        for step in range(1, max_steps + 1):
+            self.log(f"[{self.role_name}] шаг {step}/{max_steps}")
             reply = self._llm(self.history)
             self.history.append({"role": "assistant", "content": reply})
             final_parts.append(reply)
@@ -166,7 +160,8 @@ class AgentRuntime:
 
             tool_call = self._parse_tool(reply)
             if not tool_call:
-                # no tool — ask to continue or finish
+                if only_finish:
+                    return "\n\n".join(final_parts)
                 self.history.append(
                     {
                         "role": "user",
@@ -180,12 +175,12 @@ class AgentRuntime:
 
             name = tool_call.get("name", "")
             args = tool_call.get("args") or tool_call.get("arguments") or {}
-            self.log(f"TOOL: {name} {args}")
+            self.log(f"[{self.role_name}] TOOL: {name} {args}")
 
             if name == "finish":
                 summary = self._tools["finish"](args)
-                self.log(f"FINISH: {summary}")
-                return "\n\n".join(final_parts) + f"\n\n=== ИТОГ ===\n{summary}"
+                self.log(f"[{self.role_name}] FINISH: {summary}")
+                return "\n\n".join(final_parts) + f"\n\n=== ИТОГ ({self.role_name}) ===\n{summary}"
 
             if name not in self._tools:
                 result = f"Unknown tool: {name}. Available: {list(self._tools.keys())}"
@@ -195,7 +190,7 @@ class AgentRuntime:
                 except Exception as e:
                     result = f"Tool error: {e}"
 
-            self.log(f"RESULT: {str(result)[:800]}")
+            self.log(f"[{self.role_name}] RESULT: {str(result)[:800]}")
             self.history.append(
                 {
                     "role": "user",
@@ -203,4 +198,4 @@ class AgentRuntime:
                 }
             )
 
-        return "\n\n".join(final_parts) + "\n\n[Достигнут лимит шагов]"
+        return "\n\n".join(final_parts) + f"\n\n[{self.role_name}: лимит шагов]"
