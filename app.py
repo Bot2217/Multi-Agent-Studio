@@ -72,8 +72,8 @@ def provider_of(model_id: str) -> str:
 # ---------- sidebar ----------
 with st.sidebar:
     st.header("🔑 API-ключи")
-    if "keys" not in st.session_state:
-        st.session_state.keys = {
+    if "api_keys" not in st.session_state:
+        st.session_state.api_keys = {
             k: os.getenv(k, "")
             for k in [
                 "ANTHROPIC_API_KEY",
@@ -91,8 +91,8 @@ with st.sidebar:
         ("xAI", "XAI_API_KEY"),
         ("DeepSeek", "DEEPSEEK_API_KEY"),
     ]:
-        st.session_state.keys[env] = st.text_input(
-            label, value=st.session_state.keys[env], type="password", key=f"k_{env}"
+        st.session_state.api_keys[env] = st.text_input(
+            label, value=st.session_state.api_keys[env], type="password", key=f"k_{env}"
         )
 
     st.divider()
@@ -150,7 +150,7 @@ with tab_run:
         else:
             prov = provider_of(model_id)
             env_key = KEY_ENV.get(prov, "OPENAI_API_KEY")
-            api_key = st.session_state.keys.get(env_key) or os.getenv(env_key)
+            api_key = st.session_state.api_keys.get(env_key) or os.getenv(env_key)
             if not api_key:
                 st.error(f"Нет API-ключа для {prov} ({env_key})")
             else:
