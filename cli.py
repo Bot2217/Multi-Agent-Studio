@@ -1,5 +1,8 @@
-#!/usr/bin/env python3
-"""CLI entry: python cli.py "your task" """
+"""
+CLI for Multi-Agent Studio
+  python cli.py "задача"
+  python cli.py --pipeline code_only "задача"
+"""
 
 from __future__ import annotations
 
@@ -14,59 +17,41 @@ ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT))
 load_dotenv(ROOT / ".env")
 
-from core.agent_runtime import AgentRuntime
+from core.orchestrator import Orchestrator, load_config, KEY_ENV
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Agent Studio CLI")
-    parser.add_argument("task", nargs="?", help="Task text")
-    parser.add_argument("--model", default=os.getenv("AGENT_MODEL", "anthropic/claude-sonnet-4-5"))
-    parser.add_argument("--workspace", default=str(ROOT / "workspace"))
-    parser.add_argument("--max-steps", type=int, default=40)
-    parser.add_argument("--keep-awake", action="store_true", default=True)
-    parser.add_argument("--no-keep-awake", action="store_true")
-    parser.add_argument("--display", action="store_true", help="Also keep display on")
+    parser = argparse.ArgumentParser(description="Multi-Agent Studio CLI")
+    parser.add_argument("task", nargs="?", default="", help="Задача для агентов")
+    parser.add_argument("--pipeline", "-p", default=None, help="Имя пайплайна (full, code_only, ...)")
+    parser.add_argument("--workspace", "-w", default=str(ROOT / "workspace"))
+    parser.add_argument("--max-steps", type=int, default=25)
     args = parser.parse_args()
 
-    task = args.task
-    if not task:
-        task = input("Задача: ").strip()
-    if not task:
-        print("Empty task")
+    if not args.task.strip():
+        print("Использование: python cli.py [--pipeline full] \"задача\"")
         sys.exit(1)
 
-    # pick key from model prefix
-    key = None
-    if args.model.startswith("anthropic"):
-        key = os.getenv("ANTHROPIC_API_KEY")
-    elif args.model.startswith("openai"):
-        key = os.getenv("OPENAI_API_KEY")
-    elif args.model.startswith("gemini"):
-        key = os.getenv("GOOGLE_API_KEY")
-    elif args.model.startswith("xai"):
-        key = os.getenv("XAI_API_KEY")
-    elif args.model.startswith("deepseek"):
-        key = os.getenv("DEEPSEEK_API_KEY")
+    cfg = load_config()
+    pipe = args.pipeline or cfg.get("default_pipeline", "full")
 
-    runtime = AgentRuntime(
+    api_keys = {k: os.getenv(k, "") for k in KEY_ENV.values()}
+
+    def log(msg: str):
+        print(msg, flush=True)
+
+    orch = Orchestrator(
         workspace=args.workspace,
         backup_dir=str(ROOT / "backups"),
-        model=args.model,
-        api_key=key,
+        api_keys=api_keys,
+        config=cfg,
         max_steps=args.max_steps,
-        log_fn=lambda s: print(s, flush=True),
+        log_fn=log,
+        pipeline_name=pipe,
     )
-
-    if args.keep_awake and not args.no_keep_awake:
-        print(runtime.power.start("display" if args.display else "system"))
-
-    try:
-        result = runtime.run(task)
-        print("\n======== RESULT ========\n")
-        print(result)
-    finally:
-        if args.keep_awake and not args.no_keep_awake:
-            print(runtime.power.stop())
+    result = orch.run(args.task.strip())
+    print("\n======== RESULT ========\n")
+    print(result)
 
 
 if __name__ == "__main__":
