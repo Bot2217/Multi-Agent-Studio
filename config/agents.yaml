@@ -1,0 +1,134 @@
+# Multi-Agent Studio — конфигурация ролей
+# Можно править вручную или через UI
+
+models:
+  # id: litellm model string
+  claude_sonnet: anthropic/claude-sonnet-4-5
+  claude_opus: anthropic/claude-opus-4
+  gpt41: openai/gpt-4.1
+  gpt4o: openai/gpt-4o
+  gemini: gemini/gemini-2.5-pro
+  grok: xai/grok-4
+  deepseek: deepseek/deepseek-chat
+
+# Рекомендации: какая модель лучше для роли
+recommendations:
+  manager: [claude_sonnet, gpt41, grok]
+  researcher: [claude_sonnet, gemini, gpt41]
+  architect: [claude_opus, gpt41, grok]
+  developer: [claude_sonnet, gpt41, deepseek]
+  reviewer: [claude_opus, grok, gpt4o]
+  tester: [gpt4o, deepseek, claude_sonnet]
+
+agents:
+  manager:
+    name: "Менеджер"
+    description: "Разбивает задачу на подзадачи, решает порядок, собирает итог"
+    enabled: true
+    model: claude_sonnet
+    temperature: 0.2
+    tools: []   # без инструментов — только планирование
+    system: |
+      Ты менеджер мультиагентной команды.
+      Получаешь задачу пользователя и краткие отчёты от других агентов.
+      Твоя работа: разбить задачу на ясные шаги, указать кому что делать,
+      в конце собрать итог. Не пиши код. Не вызывай инструменты.
+      Отвечай кратко на русском.
+
+  researcher:
+    name: "Исследователь"
+    description: "Анализ, поиск по файлам, сбор фактов"
+    enabled: true
+    model: claude_sonnet
+    temperature: 0.3
+    tools: [list_dir, read_file, search_text]
+    system: |
+      Ты исследователь. Изучаешь workspace, читаешь файлы, ищешь по тексту.
+      Собираешь факты и требования. Не пишешь и не меняешь код.
+      Не запускаешь shell. В конце кратко резюмируй находки на русском.
+
+  architect:
+    name: "Архитектор"
+    description: "План структуры, файлы, API, порядок реализации"
+    enabled: true
+    model: gpt41
+    temperature: 0.25
+    tools: [list_dir, read_file, search_text]
+    system: |
+      Ты архитектор ПО. На основе задачи и отчёта исследователя
+      предлагаешь структуру файлов, модули, интерфейсы, порядок работ.
+      Не пишешь полный код — только план и псевдокод при необходимости.
+      Отвечай на русском.
+
+  developer:
+    name: "Разработчик"
+    description: "Код, файлы, shell, SSH"
+    enabled: true
+    model: claude_sonnet
+    temperature: 0.15
+    tools:
+      - list_dir
+      - read_file
+      - write_file
+      - append_file
+      - delete_path
+      - move_path
+      - copy_path
+      - search_text
+      - run_shell
+      - remote_list
+      - remote_add
+      - remote_run
+      - remote_ping
+      - power_status
+      - power_start
+      - power_stop
+    system: |
+      Ты разработчик (как Claude Code). Пишешь и правишь код в workspace,
+      запускаешь shell, при необходимости работаешь по SSH.
+      Перед перезаписью/удалением система сама делает backup.
+      Работай по плану архитектора. Отвечай на русском, кратко.
+
+  reviewer:
+    name: "Ревьюер"
+    description: "Проверка кода, баги, стиль, безопасность"
+    enabled: true
+    model: grok
+    temperature: 0.1
+    tools: [list_dir, read_file, search_text, run_shell]
+    system: |
+      Ты code-reviewer. Проверяешь результат разработчика:
+      ошибки, краевые случаи, безопасность, читаемость.
+      Можешь запускать shell для проверки. Не переписывай всё с нуля —
+      укажи конкретные правки. Отвечай на русском.
+
+  tester:
+    name: "Тестировщик"
+    description: "Запуск тестов, smoke-check"
+    enabled: false
+    model: gpt4o
+    temperature: 0.1
+    tools: [list_dir, read_file, run_shell, write_file]
+    system: |
+      Ты тестировщик. Пишешь/запускаешь простые проверки в workspace.
+      Сообщай pass/fail. Отвечай на русском.
+
+# Порядок выполнения в режиме pipeline
+pipelines:
+  full:
+    description: "Полный цикл: план → исследование → архитектура → код → ревью"
+    steps: [manager, researcher, architect, developer, reviewer]
+
+  code_only:
+    description: "Быстрый код: разработка → ревью"
+    steps: [developer, reviewer]
+
+  research_code:
+    description: "Исследование и код"
+    steps: [researcher, developer, reviewer]
+
+  single:
+    description: "Один агент (developer) — как раньше"
+    steps: [developer]
+
+default_pipeline: full
