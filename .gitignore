@@ -1,4 +1,5 @@
 .env
+user_settings.json
 backups/
 results/
 workspace/*
