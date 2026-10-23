@@ -1,33 +1,44 @@
 # Multi-Agent Studio — конфигурация ролей
-# Можно править вручную или через UI
+# Можно править вручную или через UI. Переопределения UI → user_settings.json
 
 models:
-  # id: litellm model string
-  claude_sonnet: anthropic/claude-sonnet-4-5
-  claude_opus: anthropic/claude-opus-4
-  gpt41: openai/gpt-4.1
-  gpt4o: openai/gpt-4o
-  gemini: gemini/gemini-2.5-pro
-  grok: xai/grok-4
-  deepseek: deepseek/deepseek-chat
+  gemini_25_flash: gemini/gemini-2.5-flash
+  gemini_25_flash_lite: gemini/gemini-2.5-flash-lite
+  gemini_25_pro: gemini/gemini-2.5-pro
+  gemini_38_flash: gemini/gemini-3.8-flash
+  claude_haiku_45: anthropic/claude-haiku-4-5
+  claude_sonnet_45: anthropic/claude-sonnet-4-5
+  claude_sonnet_55: anthropic/claude-sonnet-5-5
+  claude_opus_45: anthropic/claude-opus-4-5
+  claude_opus_55: anthropic/claude-opus-5-5
+  gpt_4o: openai/gpt-4o
+  gpt_4o_mini: openai/gpt-4o-mini
+  gpt_41: openai/gpt-4.1
+  gpt_5_mini: openai/gpt-5-mini
+  gpt_5: openai/gpt-5
+  gpt_6_luna: openai/gpt-6-luna
+  grok_4: xai/grok-4
+  grok_code_fast: xai/grok-code-fast-1
+  deepseek_chat: deepseek/deepseek-chat
+  deepseek_v4_flash: deepseek/deepseek-v4-flash
+  deepseek_r1: deepseek/deepseek-reasoner
 
-# Рекомендации: какая модель лучше для роли
 recommendations:
-  manager: [claude_sonnet, gpt41, grok]
-  researcher: [claude_sonnet, gemini, gpt41]
-  architect: [claude_opus, gpt41, grok]
-  developer: [claude_sonnet, gpt41, deepseek]
-  reviewer: [claude_opus, grok, gpt4o]
-  tester: [gpt4o, deepseek, claude_sonnet]
+  manager: [claude_sonnet_45, gpt_41, gemini_25_flash]
+  researcher: [gemini_25_flash, gemini_25_pro, claude_sonnet_45]
+  architect: [claude_opus_45, gpt_41, claude_sonnet_55]
+  developer: [claude_sonnet_45, deepseek_v4_flash, gpt_41]
+  reviewer: [claude_opus_45, grok_4, gpt_5]
+  tester: [gpt_4o_mini, deepseek_chat, gemini_25_flash_lite]
 
 agents:
   manager:
     name: "Менеджер"
     description: "Разбивает задачу на подзадачи, решает порядок, собирает итог"
     enabled: true
-    model: claude_sonnet
+    model: claude_sonnet_45
     temperature: 0.2
-    tools: []   # без инструментов — только планирование
+    tools: []
     system: |
       Ты менеджер мультиагентной команды.
       Получаешь задачу пользователя и краткие отчёты от других агентов.
@@ -39,7 +50,7 @@ agents:
     name: "Исследователь"
     description: "Анализ, поиск по файлам, сбор фактов"
     enabled: true
-    model: claude_sonnet
+    model: gemini_25_flash
     temperature: 0.3
     tools: [list_dir, read_file, search_text]
     system: |
@@ -51,7 +62,7 @@ agents:
     name: "Архитектор"
     description: "План структуры, файлы, API, порядок реализации"
     enabled: true
-    model: gpt41
+    model: gpt_41
     temperature: 0.25
     tools: [list_dir, read_file, search_text]
     system: |
@@ -64,7 +75,7 @@ agents:
     name: "Разработчик"
     description: "Код, файлы, shell, SSH"
     enabled: true
-    model: claude_sonnet
+    model: claude_sonnet_45
     temperature: 0.15
     tools:
       - list_dir
@@ -93,7 +104,7 @@ agents:
     name: "Ревьюер"
     description: "Проверка кода, баги, стиль, безопасность"
     enabled: true
-    model: grok
+    model: grok_4
     temperature: 0.1
     tools: [list_dir, read_file, search_text, run_shell]
     system: |
@@ -106,29 +117,25 @@ agents:
     name: "Тестировщик"
     description: "Запуск тестов, smoke-check"
     enabled: false
-    model: gpt4o
+    model: gpt_4o_mini
     temperature: 0.1
     tools: [list_dir, read_file, run_shell, write_file]
     system: |
       Ты тестировщик. Пишешь/запускаешь простые проверки в workspace.
       Сообщай pass/fail. Отвечай на русском.
 
-# Порядок выполнения в режиме pipeline
 pipelines:
   full:
     description: "Полный цикл: план → исследование → архитектура → код → ревью"
     steps: [manager, researcher, architect, developer, reviewer]
-
   code_only:
     description: "Быстрый код: разработка → ревью"
     steps: [developer, reviewer]
-
   research_code:
     description: "Исследование и код"
     steps: [researcher, developer, reviewer]
-
   single:
-    description: "Один агент (developer) — как раньше"
+    description: "Один агент (developer)"
     steps: [developer]
 
-default_pipeline: full
+default_pipeline: code_only
