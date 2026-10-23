@@ -1,0 +1,203 @@
+# Каталог моделей для Multi-Agent Studio (окт 2026)
+# free_tier: true = есть бесплатный квотный доступ у провайдера (лимиты RPM/RPD)
+
+models:
+  gemini_25_flash:
+    litellm: gemini/gemini-2.5-flash
+    name: Gemini 2.5 Flash
+    provider: Google
+    free_tier: true
+    price_note: free tier / иначе ~$0.30
+    context: 1M
+    best_for: быстрые задачи, исследование, черновики
+    summary: Быстрая модель Google. На AI Studio часто доступна бесплатно с лимитами RPM/RPD.
+
+  gemini_25_flash_lite:
+    litellm: gemini/gemini-2.5-flash-lite
+    name: Gemini 2.5 Flash-Lite
+    provider: Google
+    free_tier: true
+    price_note: free tier / иначе ~$0.10
+    context: 1M
+    best_for: дешёвые массовые вызовы
+    summary: Самый лёгкий Flash. Хорош для простых шагов пайплайна.
+
+  gemini_25_pro:
+    litellm: gemini/gemini-2.5-pro
+    name: Gemini 2.5 Pro
+    provider: Google
+    free_tier: true
+    price_note: free tier (лимиты) / платный выше
+    context: 1M
+    best_for: анализ, длинный контекст
+    summary: Сильнее Flash. Free tier есть, но жёстче лимиты.
+
+  gemini_38_flash:
+    litellm: gemini/gemini-3.8-flash
+    name: Gemini 3.8 Flash
+    provider: Google
+    free_tier: true
+    price_note: free tier
+    context: 1M
+    best_for: актуальный бесплатный Flash
+    summary: Актуальная линейка Flash 2026 с free tier в AI Studio.
+
+  claude_haiku_45:
+    litellm: anthropic/claude-haiku-4-5
+    name: Claude Haiku 4.5
+    provider: Anthropic
+    free_tier: false
+    price_note: ~$1 / $5
+    context: 200K
+    best_for: быстрый код, дешёвый Claude
+    summary: Самый дешёвый Claude. Нет бесплатного API-тира.
+
+  claude_sonnet_45:
+    litellm: anthropic/claude-sonnet-4-5
+    name: Claude Sonnet 4.5
+    provider: Anthropic
+    free_tier: false
+    price_note: ~$3 / $15
+    context: 1M
+    best_for: разработка, баланс цена/качество
+    summary: Основной рабочий Claude для кода и агентов.
+
+  claude_sonnet_55:
+    litellm: anthropic/claude-sonnet-5-5
+    name: Claude Sonnet 5.5
+    provider: Anthropic
+    free_tier: false
+    price_note: ~$2 / $10
+    context: 1M
+    best_for: код и сложные задачи
+    summary: Новое поколение Sonnet (2026).
+
+  claude_opus_45:
+    litellm: anthropic/claude-opus-4-5
+    name: Claude Opus 4.5
+    provider: Anthropic
+    free_tier: false
+    price_note: ~$5 / $25
+    context: 200K
+    best_for: архитектура, сложное ревью
+    summary: Топовая модель Anthropic для трудных задач.
+
+  claude_opus_55:
+    litellm: anthropic/claude-opus-5-5
+    name: Claude Opus 5.5
+    provider: Anthropic
+    free_tier: false
+    price_note: ~$4 / $20
+    context: 1M
+    best_for: максимальное качество
+    summary: Opus нового поколения, дороже, сильнее в рассуждениях.
+
+  gpt_4o:
+    litellm: openai/gpt-4o
+    name: GPT-4o
+    provider: OpenAI
+    free_tier: false
+    price_note: платный
+    context: 128K
+    best_for: универсальные задачи
+    summary: Классическая мультимодальная модель OpenAI.
+
+  gpt_4o_mini:
+    litellm: openai/gpt-4o-mini
+    name: GPT-4o Mini
+    provider: OpenAI
+    free_tier: false
+    price_note: ~$0.15 / $0.60
+    context: 128K
+    best_for: дешёвые шаги пайплайна
+    summary: Лёгкая и дешёвая OpenAI-модель.
+
+  gpt_41:
+    litellm: openai/gpt-4.1
+    name: GPT-4.1
+    provider: OpenAI
+    free_tier: false
+    price_note: платный
+    context: 1M
+    best_for: код, длинный контекст
+    summary: Сильная модель для разработки с большим контекстом.
+
+  gpt_5_mini:
+    litellm: openai/gpt-5-mini
+    name: GPT-5 Mini
+    provider: OpenAI
+    free_tier: false
+    price_note: ~$0.25 / $2
+    context: 272K
+    best_for: баланс цена/качество OpenAI
+    summary: Компактная линейка GPT-5.
+
+  gpt_5:
+    litellm: openai/gpt-5
+    name: GPT-5
+    provider: OpenAI
+    free_tier: false
+    price_note: ~$1.25 / $10
+    context: 272K
+    best_for: сложные задачи OpenAI
+    summary: Основная GPT-5.
+
+  gpt_6_luna:
+    litellm: openai/gpt-6-luna
+    name: GPT-6 Luna
+    provider: OpenAI
+    free_tier: false
+    price_note: ~$0.10 / $0.50
+    context: 922K
+    best_for: дешёвый длинный контекст
+    summary: Недорогая модель OpenAI 2026 с огромным контекстом.
+
+  grok_4:
+    litellm: xai/grok-4
+    name: Grok 4
+    provider: xAI
+    free_tier: false
+    price_note: платный
+    context: большой
+    best_for: ревью, альтернативный взгляд
+    summary: Модель xAI. Бесплатного API-тира нет.
+
+  grok_code_fast:
+    litellm: xai/grok-code-fast-1
+    name: Grok Code Fast
+    provider: xAI
+    free_tier: false
+    price_note: ~$1 / $2
+    context: 256K
+    best_for: быстрый код
+    summary: Специализация на коде, относительно недорого у xAI.
+
+  deepseek_chat:
+    litellm: deepseek/deepseek-chat
+    name: DeepSeek Chat
+    provider: DeepSeek
+    free_tier: false
+    price_note: ~$0.28 / $0.42 (очень дёшево)
+    context: 128K
+    best_for: код и общий чат за копейки
+    summary: Дешёвый сильный API. Иногда есть стартовый грант токенов, не постоянный free tier.
+
+  deepseek_v4_flash:
+    litellm: deepseek/deepseek-v4-flash
+    name: DeepSeek V4 Flash
+    provider: DeepSeek
+    free_tier: false
+    price_note: ~$0.30 / $1.20
+    context: 1M
+    best_for: быстрый код, длинный контекст
+    summary: Актуальный Flash от DeepSeek, отличная цена.
+
+  deepseek_r1:
+    litellm: deepseek/deepseek-reasoner
+    name: DeepSeek R1 (Reasoner)
+    provider: DeepSeek
+    free_tier: false
+    price_note: ~$0.55 / $2.19
+    context: 64K
+    best_for: рассуждения, сложный анализ
+    summary: Reasoning-модель DeepSeek.
