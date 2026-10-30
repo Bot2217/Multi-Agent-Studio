@@ -1,4 +1,4 @@
-"""Multi-Agent Studio"""
+"""Multi-Agent Studio test commit"""
 from __future__ import annotations
 import os, sys
 from datetime import datetime
@@ -210,3 +210,5 @@ with tab_help:
 
 Оба файла в `.gitignore`.
 """)
+
+
