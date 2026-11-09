@@ -8,15 +8,36 @@
 
 ## Как выглядит
 
-![Запуск: папка, пайплайн и задача](docs/screenshots/run.png)
+Слева переключатель из четырёх тем. Выбор пишется в `user_settings.json` и остаётся после перезапуска. Шрифт заголовков — Fraunces, текст — Outfit. Предупреждения остаются тёмным текстом на бумажной плашке, чтобы их было видно и на тёмных темах.
 
-![Каталог: фильтр бесплатных моделей, цена и дата сверки](docs/screenshots/models.png)
+### Бумага
 
-![Роли: бейдж Free tier и цена выбранной модели](docs/screenshots/agents.png)
+Тёплый лист и красная краска печатного станка. Тема по умолчанию.
+
+![Тема «Бумага»: красная кнопка запуска и бейджи Free tier](docs/screenshots/theme-paper.png)
+
+### Ночь
+
+Тёмная мастерская и латунная кнопка, без синей подсветки.
+
+![Тема «Ночь»: тёмный фон и латунный акцент](docs/screenshots/theme-night.png)
+
+### Обжиг
+
+Глиняный стол и ржавая глазурь.
+
+![Тема «Обжиг»: терракотовый фон](docs/screenshots/theme-kiln.png)
+
+### Хвоя
+
+Глубокая зелень и лимонный акцент.
+
+![Тема «Хвоя»: зелёный фон и лаймовая кнопка](docs/screenshots/theme-pine.png)
 
 ## Возможности
 
 - Пайплайны `full`, `code_only`, `research_code` и `single`. Лишнюю роль можно выключить.
+- Четыре темы оформления: Бумага, Ночь, Обжиг, Хвоя. Активная тема запоминается.
 - У каждой роли свои модель и температура. Выбор сохраняется в `user_settings.json`.
 - Каталог с бейджами **Free**, **Free tier**, **Paid**, **Local** и **Unknown**, поиском и фильтром «только бесплатные».
 - У каждой модели цена за 1M токенов входа и выхода, ссылка на источник и дата `last_verified`. Если цену нельзя было подтвердить, в карточке написано **unknown**.
@@ -192,4 +213,4 @@ Multi-Agent Studio is a local Streamlit app: several roles share a task, each wi
 
 Quick start: create a virtualenv, `pip install -r requirements.txt`, copy `.env.example` to `.env`, then `streamlit run app.py`. The default roles use Gemini’s free tier (`GOOGLE_API_KEY`). OpenRouter `:free` models and local Ollama tags need no per-token fee. Paid Claude, GPT, Grok, DeepSeek, Mistral, Groq, and Cerebras models are in the same picker.
 
-Prices were checked on **9 November 2026**. The Russian table above is the full list. `unknown` means the official number could not be verified and was not guessed. CI runs Ruff and pytest. See `config/models_catalog.yaml` for the source URL on every row.
+Prices were checked on **9 November 2026**. The Russian table above is the full list. `unknown` means the official number could not be verified and was not guessed. The sidebar switches four themes (Paper, Night, Kiln, Pine); the choice is stored in `user_settings.json`. CI runs Ruff and pytest. See `config/models_catalog.yaml` for the source URL on every row.

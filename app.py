@@ -27,6 +27,7 @@ from core.catalog import (
     sorted_model_keys,
 )
 from core.orchestrator import Orchestrator, load_config
+from core.themes import THEME_ORDER, THEMES, resolve_theme, theme_stylesheet
 from core.ui_helpers import (
     KEY_NAMES,
     load_keys_from_env,
@@ -64,51 +65,12 @@ BILLING_FILTERS = [
 
 
 def inject_css() -> None:
+    st.markdown(theme_stylesheet(st.session_state.get("theme")), unsafe_allow_html=True)
+
+
+def slip(title: str, text: str) -> None:
     st.markdown(
-        """
-        <style>
-          .block-container { padding-top: 1.25rem; padding-bottom: 3rem; max-width: 1120px; }
-          div[data-testid="stMetric"] {
-            background: #fff;
-            border: 1px solid #E3E7F0;
-            border-radius: 12px;
-            padding: 0.55rem 0.8rem;
-          }
-          .studio-lead { color: #3D475C; font-size: 1.02rem; margin-top: -0.4rem; }
-          .badge {
-            display: inline-block;
-            padding: 0.12rem 0.55rem;
-            border-radius: 999px;
-            font-size: 0.78rem;
-            font-weight: 700;
-            letter-spacing: 0.01em;
-            margin-right: 0.35rem;
-            vertical-align: middle;
-          }
-          .badge-free { background: #E5F6EC; color: #0E6B36; }
-          .badge-freemium { background: #E7F0FF; color: #1F4B99; }
-          .badge-paid { background: #FDECEC; color: #9B1C1C; }
-          .badge-local { background: #F3E8FF; color: #6B21A8; }
-          .badge-unknown { background: #EEF0F4; color: #374151; }
-          .badge-deprecated { background: #FFF4E5; color: #9A3412; }
-          .chain { display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; margin: 0.3rem 0 0.8rem; }
-          .chip {
-            background: #fff;
-            border: 1px solid #D9DFEB;
-            border-radius: 999px;
-            padding: 0.28rem 0.7rem;
-            font-size: 0.86rem;
-          }
-          .chip.off { opacity: 0.55; text-decoration: line-through; }
-          .arrow { color: #6B7280; }
-          .detail-card {
-            border: 1px solid #E3E7F0;
-            border-radius: 14px;
-            padding: 0.9rem 1rem 0.2rem;
-            background: #fff;
-          }
-        </style>
-        """,
+        f'<div class="slip"><p class="kicker">{title}</p><p>{text}</p></div>',
         unsafe_allow_html=True,
     )
 
@@ -152,6 +114,7 @@ def init_state(cfg: dict, user_set: dict, model_choices: list[str]) -> None:
         user_set.get("ollama_base") or os.getenv("OLLAMA_API_BASE") or "http://localhost:11434",
     )
     st.session_state.setdefault("last_run", None)
+    st.session_state.setdefault("theme", resolve_theme(user_set.get("theme")))
     os.environ["OLLAMA_API_BASE"] = str(st.session_state.ollama_base or "").strip()
 
 
@@ -165,6 +128,7 @@ def settings_payload() -> dict:
         "keep_awake": bool(st.session_state.get("keep_awake", True)),
         "keep_display": bool(st.session_state.get("keep_display", False)),
         "ollama_base": st.session_state.get("ollama_base") or "http://localhost:11434",
+        "theme": resolve_theme(st.session_state.get("theme")),
     }
 
 
@@ -178,8 +142,33 @@ def workspace_dir() -> Path:
     return Path(raw or DEFAULT_WS)
 
 
+def render_theme_switch() -> None:
+    current = resolve_theme(st.session_state.get("theme"))
+    st.markdown('<p class="kicker">Оформление</p>', unsafe_allow_html=True)
+    dots = "".join(
+        f'<i style="background:{THEMES[theme_id]["bg"]};box-shadow:inset -8px 0 {THEMES[theme_id]["accent"]}"></i>'
+        for theme_id in THEME_ORDER
+    )
+    st.markdown(f'<div class="palette" aria-hidden="true">{dots}</div>', unsafe_allow_html=True)
+    left, right = st.columns(2)
+    for index, theme_id in enumerate(THEME_ORDER):
+        column = left if index % 2 == 0 else right
+        with column:
+            if st.button(
+                THEMES[theme_id]["label"],
+                key=f"pick_{theme_id}",
+                type="primary" if theme_id == current else "secondary",
+                use_container_width=True,
+            ):
+                st.session_state.theme = theme_id
+                persist()
+                st.rerun()
+    st.caption(THEMES[current]["blurb"])
+
+
 def render_sidebar() -> None:
     with st.sidebar:
+        render_theme_switch()
         st.header("Ключи")
         filled = [
             label
@@ -253,9 +242,15 @@ def render_sidebar() -> None:
 
 
 def render_header(catalog: dict, active_steps: list[str]) -> None:
-    st.title("Multi-Agent Studio")
+    theme = THEMES[resolve_theme(st.session_state.get("theme"))]
     st.markdown(
-        '<p class="studio-lead">Локальная команда ролей: план, код, ревью и каталог моделей с ценой и пометкой Free или Paid.</p>',
+        (
+            '<div class="mast"><div class="mark" aria-hidden="true">МС</div><div>'
+            f'<p class="kicker">{theme["kicker"]}</p>'
+            "<h1>Multi-Agent Studio</h1>"
+            '<p class="studio-lead">Команда ролей, пайплайн и каталог с ценой. '
+            "Тема переключается слева и запоминается.</p></div></div>"
+        ),
         unsafe_allow_html=True,
     )
     free_count = sum(1 for meta in catalog.values() if is_free_option(meta))
@@ -375,7 +370,10 @@ def render_run(cfg: dict, catalog: dict, pipelines: dict) -> None:
 
     last = st.session_state.last_run
     if not last:
-        st.info("Итог появится здесь. Опишите задачу и нажмите «Запустить». Пока запуска не было.")
+        slip(
+            "Следующий шаг",
+            "Опишите задачу выше и нажмите «Запустить». Итог останется на этой странице.",
+        )
         return
     st.subheader("Последний запуск")
     st.caption(last.get("when") or "")
@@ -656,7 +654,7 @@ def render_models(catalog: dict) -> None:
         )
     st.caption(f"Показано {len(rows)} из {len(catalog)}.")
     if not rows:
-        st.info("Ничего не нашлось. Сбросьте поиск или расширьте фильтр доступа.")
+        slip("Пусто по фильтру", "Сбросьте поиск или верните доступ на «Все».")
         return
     st.dataframe(rows, use_container_width=True, hide_index=True)
     labels = {model_key: model_label(model_key, catalog) for model_key, _meta in matched}
@@ -698,8 +696,9 @@ def render_files() -> None:
     st.caption("Содержимое папки")
     st.code(filesystem.list_dir("."), language="text")
     if not entries:
-        st.info(
-            "В папке пока пусто. Запустите агента с задачей «создай файл» или положите файлы сюда сами."
+        slip(
+            "Папка пустая",
+            "Запустите агента с задачей «создай файл» или положите файлы в эту папку сами.",
         )
     else:
         files = [item.name for item in entries if item.is_file()]
@@ -762,6 +761,9 @@ def render_ssh() -> None:
 def render_help() -> None:
     st.markdown(
         """
+### Оформление
+Слева четыре темы: Бумага, Ночь, Обжиг и Хвоя. Выбор пишется в `user_settings.json` и остаётся после перезапуска.
+
 ### Как начать
 1. Создайте ключ хотя бы одного бесплатного варианта: Google AI Studio для Gemini или OpenRouter для моделей с суффиксом `:free`.
 2. Вставьте ключ слева и нажмите «Сохранить ключи».
@@ -773,7 +775,7 @@ def render_help() -> None:
 | Что | Файл |
 | --- | --- |
 | Ключи | `.env` (не коммитится) |
-| Роли, пайплайн, папка, ползунки | `user_settings.json` |
+| Роли, пайплайн, папка, тема | `user_settings.json` |
 | Каталог, цены, источники | `config/models_catalog.yaml` |
 | Промпты ролей | `config/agents.yaml` |
 | Отчёты запусков | `results/` |
@@ -794,8 +796,7 @@ def render_help() -> None:
 
 
 def main() -> None:
-    st.set_page_config(page_title="Multi-Agent Studio", page_icon="🤖", layout="wide")
-    inject_css()
+    st.set_page_config(page_title="Multi-Agent Studio", page_icon="¶", layout="wide")
     cfg = (
         load_config(ROOT / "config" / "agents.yaml")
         if (ROOT / "config" / "agents.yaml").exists()
@@ -808,6 +809,7 @@ def main() -> None:
         model_choices = ["gemini_38_flash"]
     user_set = load_user_settings()
     init_state(cfg, user_set, model_choices)
+    inject_css()
     pipelines = cfg.get("pipelines") or {
         "single": {"steps": ["developer"], "description": "одна роль"}
     }
