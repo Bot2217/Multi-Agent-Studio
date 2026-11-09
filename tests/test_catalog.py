@@ -104,11 +104,20 @@ def test_agent_config_points_at_catalog():
             assert key in catalog
 
 
-def test_readme_lists_every_model():
+def test_guide_lists_every_model_and_readme_stays_short():
+    guide = Path("docs/GUIDE.md").read_text(encoding="utf-8")
     readme = Path("README.md").read_text(encoding="utf-8")
     for meta in load_models_catalog().values():
-        assert meta["name"] in readme
-        assert meta["litellm"] in readme
+        assert meta["name"] in guide
+        assert meta["litellm"] in guide
+        assert meta["litellm"] not in readme
+    for anchor in ("install", "keys", "catalog", "agents", "files", "ssh", "themes", "settings", "dev"):
+        assert f'id="{anchor}"' in guide
+        assert f"docs/GUIDE.md#{anchor}" in readme
+    assert "git clone https://github.com/Bot2217/Multi-Agent-Studio.git" in readme
+    assert "start.bat" in readme
+    assert "start.sh" in readme
+    assert "http://localhost:8501" in readme
 
 
 def test_validator_rejects_invented_unknown_price():

@@ -2,218 +2,77 @@
 
 [![CI](https://github.com/Bot2217/Multi-Agent-Studio/actions/workflows/ci.yml/badge.svg)](https://github.com/Bot2217/Multi-Agent-Studio/actions/workflows/ci.yml)
 
-Локальная студия для небольшой команды агентов: менеджер, исследователь, архитектор, разработчик, ревьюер и тестировщик. Каждый шаг пайплайна — отдельная роль со своей моделью. Модели ходят через LiteLLM, ключи остаются у вас в `.env`.
+Локальная студия: несколько ролей по очереди делают одну задачу, у каждой своя модель.
 
-Студия рассчитана на то, чтобы начать без платного API. Роли по умолчанию стоят на Gemini с free tier: достаточно ключа Google AI Studio. Рядом лежат бесплатные модели OpenRouter, локальные веса Ollama и платные модели Claude, GPT, Grok, DeepSeek, Mistral, Groq и Cerebras.
+![Окно «Запуск»](docs/screenshots/theme-paper.png)
 
-## Как выглядит
+## Как запустить
 
-Слева меню разделов и переключатель из четырёх тем. Выбор пишется в `user_settings.json`. Заголовки — Literata, текст — Golos Text, код и ID моделей — JetBrains Mono: у всех трёх есть кириллица. Предупреждения остаются тёмным текстом на бумажной плашке.
+Нужен Python 3. Открывать студию после запуска: [http://localhost:8501](http://localhost:8501).
 
-### Бумага, раздел «Запуск»
+### Windows
 
-Меню слева, шаги 1–3 и главная кнопка. Тема по умолчанию.
+1. Клонируйте репозиторий, не скачивайте ZIP:
 
-![Запуск в теме «Бумага»](docs/screenshots/theme-paper.png)
+   ```bat
+   git clone https://github.com/Bot2217/Multi-Agent-Studio.git
+   cd Multi-Agent-Studio
+   ```
 
-### Каталог
+2. Запустите `start.bat` двойным щелчком или из cmd. Он создаст `.venv`, поставит зависимости и откроет студию.
 
-Таблица моделей на тех же токенах: радиус, тень, мелкие заголовки колонок.
+ZIP с GitHub ломает `start.bat`: в архиве у файла концы строк LF, и cmd режет команды. Клонирование через Git записывает файл правильно. Если архив уже скачан, не запускайте `start.bat`. Поставьте [Git](https://git-scm.com/download/win) и выполните команды выше либо запустите вручную:
 
-![Каталог моделей](docs/screenshots/models.png)
+```bat
+python -m venv .venv
+.venv\Scripts\python.exe -m pip install -r requirements.txt
+.venv\Scripts\python.exe -m streamlit run app.py
+```
 
-### Ночь, раздел «Запуск»
-
-Та же вёрстка на тёмной теме.
-
-![Запуск в теме «Ночь»](docs/screenshots/theme-night.png)
-
-### Ночь, раздел «Агенты»
-
-Карточки ролей, бейдж и тихая кнопка сброса.
-
-![Агенты в теме «Ночь»](docs/screenshots/agents.png)
-
-## Возможности
-
-- Пайплайны `full`, `code_only`, `research_code` и `single`. Лишнюю роль можно выключить.
-- Четыре темы оформления: Бумага, Ночь, Обжиг, Хвоя. Активная тема запоминается.
-- У каждой роли свои модель и температура. Выбор сохраняется в `user_settings.json`.
-- Каталог с бейджами **Free**, **Free tier**, **Paid**, **Local** и **Unknown**, поиском и фильтром «только бесплатные».
-- У каждой модели цена за 1M токенов входа и выхода, ссылка на источник и дата `last_verified`. Если цену нельзя было подтвердить, в карточке написано **unknown**.
-- Файлы только внутри выбранной папки, backup перед перезаписью и удалением, shell с запретом опасных шаблонов, SSH на явно указанный хост.
-- Удержание от idle-сна на время длинной задачи.
-
-## Быстрый старт
+### macOS и Linux
 
 ```bash
 git clone https://github.com/Bot2217/Multi-Agent-Studio.git
 cd Multi-Agent-Studio
-python -m venv .venv
-source .venv/bin/activate          # Windows: .venv\Scripts\activate
-pip install -r requirements.txt
-cp .env.example .env               # вставьте ключи
-streamlit run app.py               # http://localhost:8501
+chmod +x start.sh
+./start.sh
 ```
 
-Windows: двойной щелчок по `start.bat`. Скрипт подтягивает `main`, создаёт `.venv`, ставит зависимости и запускает Streamlit на http://localhost:8501. Нужен Python 3 в `PATH` (`python` или `py`). Только подготовка, без окна: `start.bat setup`.
+## Как начать в окне
 
-`start.bat` рассчитан на русскую консоль. Git хранит его в UTF-8, а в рабочую копию записывает в кодировке CP866 и с концами строк CRLF. Так `cmd.exe` не отрезает первый байт каждой строки. Не пересохраняйте файл как UTF-8 и не добавляйте `chcp 65001`.
+1. Слева откройте «Ключи», вставьте ключ и нажмите «Сохранить ключи». Для первого запуска хватит Google.
+2. В разделе «Агенты» оставьте роли как есть или выберите модель.
+3. В «Запуск» проверьте папку, напишите задачу и нажмите «Запустить».
+4. Итог появится ниже. Отчёт можно скачать.
 
-Linux и macOS: `./start.sh` делает то же самое.
+По умолчанию роли стоят на бесплатном тарифе Gemini. Другие бесплатные варианты (OpenRouter, Ollama) описаны в [каталоге](docs/GUIDE.md#catalog).
 
-Командная строка, без окна:
+## Как обновить
+
+В папке проекта:
 
 ```bash
-python cli.py --pipeline code_only "Создай hello.py и запусти"
+git pull
 ```
 
-Ключи для CLI читаются из `.env`.
+На Windows следующий запуск `start.bat` тоже делает `git pull`.
 
-## Ключи и провайдеры
+## Дальше
 
-Скопируйте `.env.example` в `.env`. Пустые ключи можно не заполнять. Файл в `.gitignore`.
+Подробности в [справочнике](docs/GUIDE.md):
 
-| Переменная | Провайдер | Зачем |
-| --- | --- | --- |
-| `GOOGLE_API_KEY` | Google AI Studio | Gemini. У Flash и 2.5 Pro есть free tier |
-| `OPENROUTER_API_KEY` | OpenRouter | модели с суффиксом `:free` и роутер `openrouter/free` |
-| `ANTHROPIC_API_KEY` | Anthropic | Claude. Бесплатного API нет |
-| `OPENAI_API_KEY` | OpenAI | GPT. Бесплатного API нет |
-| `XAI_API_KEY` | xAI | Grok |
-| `DEEPSEEK_API_KEY` | DeepSeek | `deepseek-flash` и `deepseek-v4-pro` |
-| `GROQ_API_KEY` | Groq | GPT-OSS и Qwen на Groq |
-| `MISTRAL_API_KEY` | Mistral | Small, Large, Codestral |
-| `CEREBRAS_API_KEY` | Cerebras | GPT-OSS и Qwen. Цена токена в каталоге — unknown |
-| `OLLAMA_API_BASE` | Ollama | локальные модели, ключ не нужен. По умолчанию `http://localhost:11434` |
-
-Роли, выбранный пайплайн, папка проекта и ползунки лежат в `user_settings.json`. Промпты ролей — в `config/agents.yaml`. Каталог — в `config/models_catalog.yaml`.
-
-## Как читать цены
-
-Сверено **9 ноября 2026**. Провайдер может изменить прайс раньше, чем обновится этот файл.
-
-| Бейдж | Что это |
-| --- | --- |
-| Free | За токены API платить не нужно. У OpenRouter это ответ API с нулевой ценой на дату сверки, у Mistral Moderation — официальная пометка Free |
-| Free tier | Есть бесплатная квота. В таблице рядом — платный standard-тариф, когда квота кончилась |
-| Paid | Платный API. Цифра — USD за 1M токенов входа и выхода |
-| Local | Веса на вашем компьютере через Ollama. $0 за токены, нужны диск и электричество |
-| unknown | Официальную цифру на дату сверки подтвердить не удалось. Её нет в таблице специально |
-
-Для Gemini указан standard-тариф. У GPT-6 и Grok длинный контекст дороже короткого: оговорка есть в `price_note` карточки. У DeepSeek в таблице off-peak цена без кэша; в пиковые часы она удваивается. У Claude Haiku 5.5 промпт длиннее 100k токенов тарифицируется выше.
-
-Где окно контекста в источнике не было названо числом, стоит **unknown**, а не старая оценка.
-
-## Каталог
-
-| Модель | Провайдер | ID | Доступ | Цена, USD / 1M in → out | Контекст | Проверено |
-| --- | --- | --- | --- | --- | --- | --- |
-| Gemini 2.5 Flash-Lite | Google | `gemini/gemini-2.5-flash-lite` | Free tier | $0.10 / $0.40 за 1M (paid); free tier $0 | unknown | 2026-11-09 |
-| Gemini 2.5 Flash | Google | `gemini/gemini-2.5-flash` | Free tier | $0.30 / $2.50 за 1M (paid); free tier $0 | 1M | 2026-11-09 |
-| Gemini 2.5 Pro | Google | `gemini/gemini-2.5-pro` | Free tier | $1.25 / $10 за 1M (paid); free tier $0 | unknown | 2026-11-09 |
-| Gemini 3.5 Flash-Lite | Google | `gemini/gemini-3.5-flash-lite` | Free tier | $0.30 / $2.50 за 1M (paid); free tier $0 | unknown | 2026-11-09 |
-| Gemini 3.8 Flash | Google | `gemini/gemini-3.8-flash` | Free tier | $0.75 / $3.75 за 1M (paid); free tier $0 | unknown | 2026-11-09 |
-| Gemini 4 Argon | Google | `gemini/gemini-4-argon` | Paid | $2 / $10 за 1M | unknown | 2026-11-09 |
-| GPT-4o mini | OpenAI | `openai/gpt-4o-mini` | Paid | $0.15 / $0.60 за 1M | 128K | 2026-11-09 |
-| GPT-4o | OpenAI | `openai/gpt-4o` | Paid | $2.50 / $10 за 1M | 128K | 2026-11-09 |
-| GPT-4.1 | OpenAI | `openai/gpt-4.1` | Paid | $2 / $8 за 1M | 1 047 576 | 2026-11-09 |
-| GPT-5 mini | OpenAI | `openai/gpt-5-mini` | Paid | $0.25 / $2 за 1M | 400K | 2026-11-09 |
-| GPT-5 | OpenAI | `openai/gpt-5` | Paid | $1.25 / $10 за 1M | 400K | 2026-11-09 |
-| GPT-6 Luna | OpenAI | `openai/gpt-6-luna` | Paid | $0.10 / $0.50 за 1M | 1.05M | 2026-11-09 |
-| GPT-6.1 Terra | OpenAI | `openai/gpt-6.1-terra` | Paid | $1 / $5 за 1M | 1.05M | 2026-11-09 |
-| GPT-6.1 Sol | OpenAI | `openai/gpt-6.1-sol` | Paid | $2 / $10 за 1M | 1.05M | 2026-11-09 |
-| GPT-6 Astra | OpenAI | `openai/gpt-6-astra` | Paid | $10 / $50 за 1M | 1.05M | 2026-11-09 |
-| Claude Haiku 4.5 | Anthropic | `anthropic/claude-haiku-4-5` | Paid | $1 / $5 за 1M | unknown | 2026-11-09 |
-| Claude Sonnet 4.5 | Anthropic | `anthropic/claude-sonnet-4-5` | Paid | $3 / $15 за 1M | unknown | 2026-11-09 |
-| Claude Opus 4.5 | Anthropic | `anthropic/claude-opus-4-5` | Paid | $5 / $25 за 1M | unknown | 2026-11-09 |
-| Claude Haiku 5.5 | Anthropic | `anthropic/claude-haiku-5-5` | Paid | $0.10 / $0.50 за 1M | 1M | 2026-11-09 |
-| Claude Sonnet 5.5 | Anthropic | `anthropic/claude-sonnet-5-5` | Paid | $2 / $10 за 1M | 1M | 2026-11-09 |
-| Claude Opus 5.5 | Anthropic | `anthropic/claude-opus-5-5` | Paid | $4 / $20 за 1M | 1M | 2026-11-09 |
-| Claude Fable 5.2 | Anthropic | `anthropic/claude-fable-5-2` | Paid | $8 / $40 за 1M | 1M | 2026-11-09 |
-| Grok 4.7 | xAI | `xai/grok-4.7` | Paid | $2 / $6 за 1M | 500K | 2026-11-09 |
-| Grok 4.5 | xAI | `xai/grok-4.5` | Paid | $2 / $6 за 1M | 500K | 2026-11-09 |
-| Grok 4.3 | xAI | `xai/grok-4.3` | Paid | $1.25 / $2.50 за 1M | 1M | 2026-11-09 |
-| Grok Build 0.1 | xAI | `xai/grok-build-0.1` | Paid | $1 / $2 за 1M | 256K | 2026-11-09 |
-| DeepSeek Flash | DeepSeek | `deepseek/deepseek-flash` | Paid | $0.15 / $0.60 за 1M | 1M | 2026-11-09 |
-| DeepSeek V4 Pro | DeepSeek | `deepseek/deepseek-v4-pro` | Paid | $0.66 / $1.98 за 1M | 1M | 2026-11-09 |
-| GPT-OSS 20B (Groq) | Groq | `groq/openai/gpt-oss-20b` | Paid | $0.075 / $0.30 за 1M | 131 072 | 2026-11-09 |
-| GPT-OSS 120B (Groq) | Groq | `groq/openai/gpt-oss-120b` | Paid | $0.15 / $0.60 за 1M | 131 072 | 2026-11-09 |
-| Qwen 3.8 27B (Groq) | Groq | `groq/qwen/qwen3.8-27b` | Paid | $0.80 / $4 за 1M | 131 072 | 2026-11-09 |
-| Mistral Small 4 | Mistral | `mistral/mistral-small-2603` | Paid | $0.15 / $0.60 за 1M | 256K | 2026-11-09 |
-| Mistral Large 4 | Mistral | `mistral/mistral-large-4` | Paid | $0.70 / $2.10 за 1M | 1M | 2026-11-09 |
-| Codestral | Mistral | `mistral/codestral-2508` | Paid | $0.30 / $0.90 за 1M | 128K | 2026-11-09 |
-| Mistral Moderation 2 | Mistral | `mistral/mistral-moderation-2603` | Free | $0 / $0 за 1M | 128K | 2026-11-09 |
-| GPT-OSS 120B (Cerebras) | Cerebras | `cerebras/gpt-oss-120b` | Paid | unknown | 131K paid / 65K trial | 2026-11-09 |
-| Qwen 3.8 27B (Cerebras) | Cerebras | `cerebras/qwen-3.8-27b` | Paid | unknown | 128K paid / 64K trial | 2026-11-09 |
-| Nemotron 3 Ultra (free) | OpenRouter | `openrouter/nvidia/nemotron-3-ultra-550b-a55b:free` | Free | $0 / $0 за 1M | 1 000 000 | 2026-11-09 |
-| Nemotron 3.5 Lightning (free) | OpenRouter | `openrouter/nvidia/nemotron-3.5-lightning:free` | Free | $0 / $0 за 1M | 1 000 000 | 2026-11-09 |
-| Nemotron 3.5 Super VL (free) | OpenRouter | `openrouter/nvidia/nemotron-3.5-super-vl:free` | Free | $0 / $0 за 1M | 1 000 000 | 2026-11-09 |
-| Nemotron 3 Nano Omni (free) | OpenRouter | `openrouter/nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free` | Free | $0 / $0 за 1M | 256 000 | 2026-11-09 |
-| Gemma 4 31B (free) | OpenRouter | `openrouter/google/gemma-4-31b-it:free` | Free | $0 / $0 за 1M | 262 144 | 2026-11-09 |
-| Gemma 4 26B A4B (free) | OpenRouter | `openrouter/google/gemma-4-26b-a4b-it:free` | Free | $0 / $0 за 1M | 262 144 | 2026-11-09 |
-| North Mini Code (free) | OpenRouter | `openrouter/cohere/north-mini-code:free` | Free | $0 / $0 за 1M | 256 000 | 2026-11-09 |
-| Flint v1 (free) | OpenRouter | `openrouter/recursive/flint-v1.0:free` | Free | $0 / $0 за 1M | 262 144 | 2026-11-09 |
-| Xing4.0 29B (free) | OpenRouter | `openrouter/xingchen-agi/xing4.0-29b-a4b:free` | Free | $0 / $0 за 1M | 262 144 | 2026-11-09 |
-| Dots3-Note Preview (free) | OpenRouter | `openrouter/dots-studio/dots-3-note-preview:free` | Free | $0 / $0 за 1M | 512 000 | 2026-11-09 |
-| LFM3 1.7B (free) | OpenRouter | `openrouter/liquid/lfm-3-1.7b:free` | Free | $0 / $0 за 1M | 262 144 | 2026-11-09 |
-| LFM 2.5 2.6B (free) | OpenRouter | `openrouter/liquid/lfm-2.5-2.6b:free` | Free | $0 / $0 за 1M | 65 536 | 2026-11-09 |
-| OpenRouter Free Router | OpenRouter | `openrouter/openrouter/free` | Free | $0 / $0 за 1M | 200 000 | 2026-11-09 |
-| Crouton Alpha | OpenRouter | `openrouter/stealth/crouton-alpha` | Free | $0 / $0 за 1M | 1 048 576 | 2026-11-09 |
-| Gemma 4 (Ollama) | Ollama | `ollama_chat/gemma4` | Local | $0 / $0 за 1M | unknown | 2026-11-09 |
-| Llama 3.2 (Ollama) | Ollama | `ollama_chat/llama3.2` | Local | $0 / $0 за 1M | unknown | 2026-11-09 |
-| Qwen 3 (Ollama) | Ollama | `ollama_chat/qwen3` | Local | $0 / $0 за 1M | unknown | 2026-11-09 |
-| Qwen 3.5 (Ollama) | Ollama | `ollama_chat/qwen3.5` | Local | $0 / $0 за 1M | unknown | 2026-11-09 |
-| Qwen 2.5 Coder (Ollama) | Ollama | `ollama_chat/qwen2.5-coder` | Local | $0 / $0 за 1M | unknown | 2026-11-09 |
-| DeepSeek R1 (Ollama) | Ollama | `ollama_chat/deepseek-r1` | Local | $0 / $0 за 1M | unknown | 2026-11-09 |
-| Phi-4 (Ollama) | Ollama | `ollama_chat/phi4` | Local | $0 / $0 за 1M | unknown | 2026-11-09 |
-| Mistral (Ollama) | Ollama | `ollama_chat/mistral` | Local | $0 / $0 за 1M | unknown | 2026-11-09 |
-
-Mistral Moderation 2 бесплатная, но это классификатор, не чат. В список ролей она не попадает.
-
-Локальные теги нужно скачать самим, например `ollama pull gemma4`. Карточки Ollama: [ollama.com/library](https://ollama.com/library).
-
-## Что делают роли
-
-| Роль | По умолчанию | Задача |
-| --- | --- | --- |
-| Менеджер | Gemini 3.8 Flash | разбить задачу, собрать итог, без инструментов |
-| Исследователь | Gemini 2.5 Flash | читать файлы и собирать факты |
-| Архитектор | Gemini 2.5 Pro | план файлов и интерфейсов |
-| Разработчик | Gemini 3.8 Flash | код, shell, при необходимости SSH |
-| Ревьюер | Gemini 2.5 Pro | замечания по коду |
-| Тестировщик | Gemini 2.5 Flash-Lite | выключен, пока не включите |
-
-В разделе «Агенты» у каждой роли есть более сильные платные рекомендации: Claude Sonnet 5.5, Opus 5.5, GPT-6.1, Grok 4.7, DeepSeek Flash.
-
-## Вклад и проверки
-
-CI на GitHub Actions гоняет `ruff format --check`, `ruff check` и `pytest`.
-
-Чтобы добавить модель:
-
-1. Допишите запись в `config/models_catalog.yaml`: ID, провайдер, `billing`, цена входа и выхода за 1M или `price_status: unknown`, `source` (ссылка), `last_verified`.
-2. Не ставьте цену по памяти. Если страница не открылась или цифры нет, пишите `unknown`.
-3. Если у провайдера есть и free tier, и платный тариф, `billing: freemium`, а в полях цены — платный standard.
-4. Запустите `ruff format --check .`, `ruff check .` и `pytest -q`.
-
-Зависимости для разработки: `pip install -r requirements-dev.txt`.
-
-## Безопасность
-
-- Инструменты файлов не выходят из выбранной папки. Папка с тем же префиксом имени (`workspace` и `workspace_evil`) тоже снаружи.
-- Перед перезаписью и удалением копия кладётся в `backups/`.
-- Shell режет известные опасные шаблоны вроде `rm -rf /`.
-- SSH выполняется только на хост из формы. Ключ предпочтительнее пароля, пароль форма не спрашивает.
-
-Не кладите боевые ключи в репозиторий и не отправляйте в бесплатные API данные, которые нельзя отдавать провайдеру: у free tier Google контент может использоваться для улучшения продуктов, у части бесплатных маршрутов OpenRouter политика другая. Это написано в карточке модели.
-
----
+- [Установка и неполадки](docs/GUIDE.md#install)
+- [Ключи API](docs/GUIDE.md#keys)
+- [Каталог моделей](docs/GUIDE.md#catalog)
+- [Агенты](docs/GUIDE.md#agents)
+- [Файлы](docs/GUIDE.md#files)
+- [SSH](docs/GUIDE.md#ssh)
+- [Темы](docs/GUIDE.md#themes)
+- [Настройки](docs/GUIDE.md#settings)
+- [Разработка и CI](docs/GUIDE.md#dev)
 
 ## English
 
-Multi-Agent Studio is a local Streamlit app: several roles share a task, each with its own model, and the model catalog records whether a model is free or paid.
+Local multi-agent studio. Each role calls its own model.
 
-Quick start: create a virtualenv, `pip install -r requirements.txt`, copy `.env.example` to `.env`, then `streamlit run app.py`. On Windows, double-click `start.bat` (`start.bat setup` only installs dependencies). Git checks that file out as CP866 with CRLF so cmd.exe does not split the commands. The default roles use Gemini’s free tier (`GOOGLE_API_KEY`). OpenRouter `:free` models and local Ollama tags need no per-token fee. Paid Claude, GPT, Grok, DeepSeek, Mistral, Groq, and Cerebras models are in the same picker.
-
-Prices were checked on **9 November 2026**. The Russian table above is the full list. `unknown` means the official number could not be verified and was not guessed. The left menu replaces stock tabs. Headings use Literata, body text Golos Text, and code JetBrains Mono, all with Cyrillic. The sidebar switches four themes (Paper, Night, Kiln, Pine); the choice is stored in `user_settings.json`. CI runs Ruff and pytest. See `config/models_catalog.yaml` for the source URL on every row.
+Windows: `git clone https://github.com/Bot2217/Multi-Agent-Studio.git`, then `start.bat`. A GitHub ZIP breaks the batch file; clone instead. macOS and Linux: `./start.sh`. Open [http://localhost:8501](http://localhost:8501). The full guide is in Russian: [docs/GUIDE.md](docs/GUIDE.md).
