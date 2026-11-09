@@ -31,11 +31,17 @@ class WorkspaceFS:
             p = self.root / p
         p = p.resolve()
         allowed = [self.root] + self.extra_roots
-        if not any(str(p).startswith(str(r)) for r in allowed):
-            raise PermissionError(
-                f"Path outside allowed workspace: {p}. Allowed roots: {allowed}"
-            )
+        if not any(self._is_under(p, root) for root in allowed):
+            raise PermissionError(f"Path outside allowed workspace: {p}. Allowed roots: {allowed}")
         return p
+
+    @staticmethod
+    def _is_under(path: Path, root: Path) -> bool:
+        try:
+            path.relative_to(root)
+        except ValueError:
+            return False
+        return True
 
     def _backup(self, path: Path) -> Optional[Path]:
         if not path.exists():

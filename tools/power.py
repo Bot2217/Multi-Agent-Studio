@@ -59,17 +59,20 @@ class PowerManager:
         self._active = False
         try:
             from wakepy import unset_keepawake
+
             unset_keepawake()
         except Exception:
             pass
         try:
             from keep_awake import allow_sleep
+
             allow_sleep()
         except Exception:
             pass
         if self._system == "Windows":
             try:
                 import ctypes
+
                 ctypes.windll.kernel32.SetThreadExecutionState(0x80000000)
             except Exception:
                 pass
@@ -78,6 +81,7 @@ class PowerManager:
     def _try_wakepy(self, mode: str) -> bool:
         try:
             from wakepy import set_keepawake
+
             set_keepawake(keep_screen_awake=(mode == "display"))
             return True
         except Exception:
@@ -86,6 +90,7 @@ class PowerManager:
     def _try_keep_awake(self) -> bool:
         try:
             from keep_awake import prevent_sleep
+
             return bool(prevent_sleep())
         except Exception:
             return False
@@ -94,6 +99,7 @@ class PowerManager:
         if self._system == "Windows":
             try:
                 import ctypes
+
                 # ES_CONTINUOUS | ES_SYSTEM_REQUIRED | optional ES_DISPLAY_REQUIRED
                 flags = 0x80000000 | 0x00000001
                 if mode == "display":
