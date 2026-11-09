@@ -20,3 +20,17 @@ jobs:
         run: ruff check .
       - name: Test
         run: pytest -q
+
+  windows-launcher:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Launcher setup creates the venv and installs dependencies
+        shell: cmd
+        run: start.bat setup
+      - name: Virtualenv can import Streamlit
+        shell: cmd
+        run: .venv\Scripts\python.exe -c "import streamlit; print(streamlit.__version__)"
