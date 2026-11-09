@@ -111,7 +111,17 @@ def test_guide_lists_every_model_and_readme_stays_short():
         assert meta["name"] in guide
         assert meta["litellm"] in guide
         assert meta["litellm"] not in readme
-    for anchor in ("install", "keys", "catalog", "agents", "files", "ssh", "themes", "settings", "dev"):
+    for anchor in (
+        "install",
+        "keys",
+        "catalog",
+        "agents",
+        "files",
+        "ssh",
+        "themes",
+        "settings",
+        "dev",
+    ):
         assert f'id="{anchor}"' in guide
         assert f"docs/GUIDE.md#{anchor}" in readme
     assert "git clone https://github.com/Bot2217/Multi-Agent-Studio.git" in readme
