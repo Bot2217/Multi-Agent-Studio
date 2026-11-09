@@ -1,8 +1,11 @@
 from core.themes import (
     DEFAULT_THEME,
+    SCREENS,
     THEME_ORDER,
     THEMES,
     contrast_issues,
+    contrast_ratio,
+    resolve_screen,
     resolve_theme,
     theme_stylesheet,
 )
@@ -30,6 +33,19 @@ def test_every_theme_meets_contrast_and_css():
         assert THEMES[theme_id]["bg"] in css
         assert THEMES[theme_id]["accent"] in css
         assert "prefers-reduced-motion" in css
+
+
+def test_design_tokens_fonts_and_nav():
+    css = theme_stylesheet("paper")
+    for token in ("--space-4", "--radius-m", "--shadow", "--font-mono", "--danger", "--type-lg"):
+        assert token in css
+    assert "Literata" in css
+    assert "Golos Text" in css
+    assert "JetBrains Mono" in css
+    assert contrast_ratio("#fffaf3", "#8c2f24") >= 4.5
+    assert SCREENS[0] == ("run", "Запуск")
+    assert resolve_screen("models") == "models"
+    assert resolve_screen("nope") == "run"
 
 
 def test_saved_theme_roundtrip(tmp_path, monkeypatch):

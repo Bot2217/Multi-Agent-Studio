@@ -8,31 +8,31 @@
 
 ## Как выглядит
 
-Слева переключатель из четырёх тем. Выбор пишется в `user_settings.json` и остаётся после перезапуска. Шрифт заголовков — Fraunces, текст — Outfit. Предупреждения остаются тёмным текстом на бумажной плашке, чтобы их было видно и на тёмных темах.
+Слева меню разделов и переключатель из четырёх тем. Выбор пишется в `user_settings.json`. Заголовки — Literata, текст — Golos Text, код и ID моделей — JetBrains Mono: у всех трёх есть кириллица. Предупреждения остаются тёмным текстом на бумажной плашке.
 
-### Бумага
+### Бумага, раздел «Запуск»
 
-Тёплый лист и красная краска печатного станка. Тема по умолчанию.
+Меню слева, шаги 1–3 и главная кнопка. Тема по умолчанию.
 
-![Тема «Бумага»: красная кнопка запуска и бейджи Free tier](docs/screenshots/theme-paper.png)
+![Запуск в теме «Бумага»](docs/screenshots/theme-paper.png)
 
-### Ночь
+### Каталог
 
-Тёмная мастерская и латунная кнопка, без синей подсветки.
+Таблица моделей на тех же токенах: радиус, тень, мелкие заголовки колонок.
 
-![Тема «Ночь»: тёмный фон и латунный акцент](docs/screenshots/theme-night.png)
+![Каталог моделей](docs/screenshots/models.png)
 
-### Обжиг
+### Ночь, раздел «Запуск»
 
-Глиняный стол и ржавая глазурь.
+Та же вёрстка на тёмной теме.
 
-![Тема «Обжиг»: терракотовый фон](docs/screenshots/theme-kiln.png)
+![Запуск в теме «Ночь»](docs/screenshots/theme-night.png)
 
-### Хвоя
+### Ночь, раздел «Агенты»
 
-Глубокая зелень и лимонный акцент.
+Карточки ролей, бейдж и тихая кнопка сброса.
 
-![Тема «Хвоя»: зелёный фон и лаймовая кнопка](docs/screenshots/theme-pine.png)
+![Агенты в теме «Ночь»](docs/screenshots/agents.png)
 
 ## Возможности
 
@@ -181,7 +181,7 @@ Mistral Moderation 2 бесплатная, но это классификато�
 | Ревьюер | Gemini 2.5 Pro | замечания по коду |
 | Тестировщик | Gemini 2.5 Flash-Lite | выключен, пока не включите |
 
-На вкладке «Агенты» у каждой роли есть более сильные платные рекомендации: Claude Sonnet 5.5, Opus 5.5, GPT-6.1, Grok 4.7, DeepSeek Flash.
+В разделе «Агенты» у каждой роли есть более сильные платные рекомендации: Claude Sonnet 5.5, Opus 5.5, GPT-6.1, Grok 4.7, DeepSeek Flash.
 
 ## Вклад и проверки
 
@@ -213,4 +213,4 @@ Multi-Agent Studio is a local Streamlit app: several roles share a task, each wi
 
 Quick start: create a virtualenv, `pip install -r requirements.txt`, copy `.env.example` to `.env`, then `streamlit run app.py`. The default roles use Gemini’s free tier (`GOOGLE_API_KEY`). OpenRouter `:free` models and local Ollama tags need no per-token fee. Paid Claude, GPT, Grok, DeepSeek, Mistral, Groq, and Cerebras models are in the same picker.
 
-Prices were checked on **9 November 2026**. The Russian table above is the full list. `unknown` means the official number could not be verified and was not guessed. The sidebar switches four themes (Paper, Night, Kiln, Pine); the choice is stored in `user_settings.json`. CI runs Ruff and pytest. See `config/models_catalog.yaml` for the source URL on every row.
+Prices were checked on **9 November 2026**. The Russian table above is the full list. `unknown` means the official number could not be verified and was not guessed. The left menu replaces stock tabs. Headings use Literata, body text Golos Text, and code JetBrains Mono, all with Cyrillic. The sidebar switches four themes (Paper, Night, Kiln, Pine); the choice is stored in `user_settings.json`. CI runs Ruff and pytest. See `config/models_catalog.yaml` for the source URL on every row.

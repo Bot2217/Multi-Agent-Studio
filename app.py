@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import html
 import os
 import sys
 import traceback
@@ -27,7 +28,14 @@ from core.catalog import (
     sorted_model_keys,
 )
 from core.orchestrator import Orchestrator, load_config
-from core.themes import THEME_ORDER, THEMES, resolve_theme, theme_stylesheet
+from core.themes import (
+    SCREENS,
+    THEME_ORDER,
+    THEMES,
+    resolve_screen,
+    resolve_theme,
+    theme_stylesheet,
+)
 from core.ui_helpers import (
     KEY_NAMES,
     load_keys_from_env,
@@ -70,7 +78,19 @@ def inject_css() -> None:
 
 def slip(title: str, text: str) -> None:
     st.markdown(
-        f'<div class="slip"><p class="kicker">{title}</p><p>{text}</p></div>',
+        f'<div class="slip"><p class="kicker">{html.escape(title)}</p><p>{html.escape(text)}</p></div>',
+        unsafe_allow_html=True,
+    )
+
+
+def step(number: str, title: str, hint: str = "") -> None:
+    hint_html = f'<p class="step-hint">{html.escape(hint)}</p>' if hint else ""
+    st.markdown(
+        (
+            '<div class="step">'
+            f'<span class="step-no">{html.escape(number)}</span>'
+            f"<div><h2>{html.escape(title)}</h2>{hint_html}</div></div>"
+        ),
         unsafe_allow_html=True,
     )
 
@@ -115,6 +135,7 @@ def init_state(cfg: dict, user_set: dict, model_choices: list[str]) -> None:
     )
     st.session_state.setdefault("last_run", None)
     st.session_state.setdefault("theme", resolve_theme(user_set.get("theme")))
+    st.session_state.setdefault("screen", resolve_screen(user_set.get("screen")))
     os.environ["OLLAMA_API_BASE"] = str(st.session_state.ollama_base or "").strip()
 
 
@@ -129,6 +150,7 @@ def settings_payload() -> dict:
         "keep_display": bool(st.session_state.get("keep_display", False)),
         "ollama_base": st.session_state.get("ollama_base") or "http://localhost:11434",
         "theme": resolve_theme(st.session_state.get("theme")),
+        "screen": resolve_screen(st.session_state.get("screen")),
     }
 
 
@@ -166,8 +188,24 @@ def render_theme_switch() -> None:
     st.caption(THEMES[current]["blurb"])
 
 
+def render_nav() -> None:
+    current = resolve_screen(st.session_state.get("screen"))
+    st.markdown('<p class="kicker">Разделы</p>', unsafe_allow_html=True)
+    for screen_id, label in SCREENS:
+        if st.button(
+            label,
+            key=f"nav_{screen_id}",
+            type="primary" if screen_id == current else "secondary",
+            use_container_width=True,
+        ):
+            st.session_state.screen = screen_id
+            persist()
+            st.rerun()
+
+
 def render_sidebar() -> None:
     with st.sidebar:
+        render_nav()
         render_theme_switch()
         st.header("Ключи")
         filled = [
@@ -202,43 +240,47 @@ def render_sidebar() -> None:
                 )
                 persist()
                 st.success("Ключи записаны в .env")
-            if st.button("Перечитать .env", use_container_width=True):
+            if st.button("Перечитать .env", type="tertiary", use_container_width=True):
                 st.session_state.api_keys = load_keys_from_env()
                 for _label, env, _hint in KEY_LABELS:
                     st.session_state[f"k_{env}"] = st.session_state.api_keys.get(env, "")
                 st.rerun()
 
         st.divider()
-        st.header("Запуск")
-        st.slider(
-            "Макс. шагов агента",
-            5,
-            80,
-            key="max_steps",
-            help="Сколько вызовов модели у одной роли.",
+        with st.expander("Параметры запуска", expanded=False):
+            _render_run_settings()
+
+
+def _render_run_settings() -> None:
+    st.slider(
+        "Макс. шагов агента",
+        5,
+        80,
+        key="max_steps",
+        help="Сколько вызовов модели у одной роли.",
+    )
+    st.slider("Таймаут shell, сек", 10, 300, key="shell_timeout")
+    st.checkbox(
+        "Не давать системе уснуть",
+        key="keep_awake",
+        help="Блокирует idle-сон на время задачи. Настоящий сон с замороженным процессом здесь невозможен.",
+    )
+    st.checkbox("Держать экран включённым", key="keep_display")
+    st.text_input(
+        "Адрес Ollama",
+        key="ollama_base",
+        help="Нужен только для локальных моделей. Ключ API не требуется.",
+    )
+    if st.button("Сохранить настройки", use_container_width=True):
+        persist()
+        save_keys_to_env(
+            st.session_state.api_keys,
+            {
+                "WORKSPACE_PATH": str(workspace_dir()),
+                "OLLAMA_API_BASE": st.session_state.ollama_base,
+            },
         )
-        st.slider("Таймаут shell, сек", 10, 300, key="shell_timeout")
-        st.checkbox(
-            "Не давать системе уснуть",
-            key="keep_awake",
-            help="Блокирует idle-сон на время задачи. Настоящий сон с замороженным процессом здесь невозможен.",
-        )
-        st.checkbox("Держать экран включённым", key="keep_display")
-        st.text_input(
-            "Адрес Ollama",
-            key="ollama_base",
-            help="Нужен только для локальных моделей. Ключ API не требуется.",
-        )
-        if st.button("Сохранить настройки", use_container_width=True):
-            persist()
-            save_keys_to_env(
-                st.session_state.api_keys,
-                {
-                    "WORKSPACE_PATH": str(workspace_dir()),
-                    "OLLAMA_API_BASE": st.session_state.ollama_base,
-                },
-            )
-            st.success("Настройки записаны в user_settings.json")
+        st.success("Настройки записаны в user_settings.json")
 
 
 def render_header(catalog: dict, active_steps: list[str]) -> None:
@@ -248,8 +290,8 @@ def render_header(catalog: dict, active_steps: list[str]) -> None:
             '<div class="mast"><div class="mark" aria-hidden="true">МС</div><div>'
             f'<p class="kicker">{theme["kicker"]}</p>'
             "<h1>Multi-Agent Studio</h1>"
-            '<p class="studio-lead">Команда ролей, пайплайн и каталог с ценой. '
-            "Тема переключается слева и запоминается.</p></div></div>"
+            '<p class="studio-lead">Сначала папка, затем задача, затем «Запустить». '
+            "Разделы и тема — в колонке слева.</p></div></div>"
         ),
         unsafe_allow_html=True,
     )
@@ -266,7 +308,7 @@ def render_header(catalog: dict, active_steps: list[str]) -> None:
     if folder.is_dir():
         st.caption(f"Папка проекта: {folder}")
     else:
-        st.warning(f"Папки проекта ещё нет: {folder}. Создайте её на вкладке «Запуск».")
+        st.warning(f"Папки проекта ещё нет: {folder}. Создайте её в разделе «Запуск».")
 
 
 def active_agent_ids(cfg: dict, steps: list[str]) -> list[str]:
@@ -302,10 +344,7 @@ def render_chain(cfg: dict, steps: list[str], catalog: dict) -> None:
 
 
 def render_run(cfg: dict, catalog: dict, pipelines: dict) -> None:
-    st.subheader("Папка проекта")
-    st.caption(
-        "Агенты читают и пишут только внутри выбранной папки. Перед перезаписью делается backup."
-    )
+    step("1", "Папка", "Агенты работают только внутри неё. Перед перезаписью делается backup.")
     presets = preset_paths(DEFAULT_WS)
     columns = st.columns(min(4, max(len(presets), 1)))
     for index, (label, path) in enumerate(presets):
@@ -329,7 +368,7 @@ def render_run(cfg: dict, catalog: dict, pipelines: dict) -> None:
     else:
         st.warning("Такой папки нет. Создайте её или выберите другой путь.")
 
-    st.subheader("Пайплайн")
+    step("2", "Пайплайн", "Включённые роли идут слева направо.")
     pipe_names = list(pipelines.keys())
     if st.session_state.pipeline_select not in pipe_names:
         st.session_state.pipeline_select = pipe_names[0]
@@ -344,7 +383,7 @@ def render_run(cfg: dict, catalog: dict, pipelines: dict) -> None:
     active = active_agent_ids(cfg, steps)
     if not active:
         st.error(
-            "В этом пайплайне нет включённых ролей. Откройте вкладку «Агенты» и включите хотя бы одну."
+            "В этом пайплайне нет включённых ролей. Откройте раздел «Агенты» слева и включите хотя бы одну."
         )
     else:
         missing = missing_credentials(
@@ -358,13 +397,14 @@ def render_run(cfg: dict, catalog: dict, pipelines: dict) -> None:
                 + ". Такой шаг будет пропущен. Локальный Ollama ключ не требует."
             )
 
+    step("3", "Задача", "Одно предложение достаточно. Итог останется ниже.")
     task = st.text_area(
         "Задача",
         height=150,
         placeholder="Например: создай hello.py, который печатает приветствие, и запусти его.",
         key="task_text",
     )
-    run_clicked = st.button("Запустить", type="primary", use_container_width=True)
+    run_clicked = st.button("Запустить", type="primary", use_container_width=True, key="launch_run")
     if run_clicked:
         execute_run(cfg, catalog, pipeline_name, task, active)
 
@@ -375,24 +415,25 @@ def render_run(cfg: dict, catalog: dict, pipelines: dict) -> None:
             "Опишите задачу выше и нажмите «Запустить». Итог останется на этой странице.",
         )
         return
-    st.subheader("Последний запуск")
-    st.caption(last.get("when") or "")
-    if last.get("logs"):
-        with st.expander("Журнал", expanded=bool(last.get("error"))):
-            st.code("\n".join(last["logs"][-80:]), language="text")
-    if last.get("error"):
-        st.error(last["error"])
-        if last.get("traceback"):
-            with st.expander("Техническая подробность"):
-                st.code(last["traceback"], language="text")
-    elif last.get("result"):
-        st.markdown(last["result"])
-        st.download_button(
-            "Скачать отчёт",
-            data=last.get("report") or last["result"],
-            file_name=last.get("file_name") or "run.md",
-            mime="text/markdown",
-        )
+    with st.container(key="result_panel"):
+        st.markdown('<p class="kicker">Результат</p>', unsafe_allow_html=True)
+        st.caption(last.get("when") or "")
+        if last.get("logs"):
+            with st.expander("Журнал", expanded=bool(last.get("error"))):
+                st.code("\n".join(last["logs"][-80:]), language="text")
+        if last.get("error"):
+            st.error(last["error"])
+            if last.get("traceback"):
+                with st.expander("Техническая подробность"):
+                    st.code(last["traceback"], language="text")
+        elif last.get("result"):
+            st.markdown(last["result"])
+            st.download_button(
+                "Скачать отчёт",
+                data=last.get("report") or last["result"],
+                file_name=last.get("file_name") or "run.md",
+                mime="text/markdown",
+            )
 
 
 def model_keys_for(cfg: dict, agent_ids: list[str]) -> list[str]:
@@ -564,7 +605,7 @@ def render_agents(cfg: dict, catalog: dict, model_choices: list[str]) -> None:
             persist()
             st.success("Роли сохранены.")
     with col_reset:
-        if st.button("Вернуть модели из agents.yaml", use_container_width=True):
+        if st.button("Вернуть модели из agents.yaml", type="tertiary", use_container_width=True):
             for agent_id, agent_cfg in agents_cfg.items():
                 st.session_state.agent_overrides[agent_id] = {
                     "enabled": agent_cfg.get("enabled", True),
@@ -656,7 +697,7 @@ def render_models(catalog: dict) -> None:
     if not rows:
         slip("Пусто по фильтру", "Сбросьте поиск или верните доступ на «Все».")
         return
-    st.dataframe(rows, use_container_width=True, hide_index=True)
+    render_sheet(rows)
     labels = {model_key: model_label(model_key, catalog) for model_key, _meta in matched}
     selected = st.selectbox("Карточка модели", list(labels), format_func=lambda key: labels[key])
     meta = catalog[selected]
@@ -679,11 +720,27 @@ def render_models(catalog: dict) -> None:
     st.markdown("</div>", unsafe_allow_html=True)
 
 
+def render_sheet(rows: list[dict]) -> None:
+    columns = list(rows[0].keys())
+    head = "".join(f"<th>{html.escape(str(column))}</th>" for column in columns)
+    body = []
+    for row in rows:
+        cells = "".join(f"<td>{html.escape(str(row.get(column, '')))}</td>" for column in columns)
+        body.append(f"<tr>{cells}</tr>")
+    st.markdown(
+        (
+            '<div class="sheet-wrap"><table class="sheet"><thead><tr>'
+            f"{head}</tr></thead><tbody>{''.join(body)}</tbody></table></div>"
+        ),
+        unsafe_allow_html=True,
+    )
+
+
 def render_files() -> None:
     folder = workspace_dir()
     st.caption(f"Корень: {folder}")
     if not folder.is_dir():
-        st.warning("Папка проекта не найдена. Создайте её на вкладке «Запуск».")
+        st.warning("Папка проекта не найдена. Создайте её в разделе «Запуск».")
         return
     try:
         from tools.filesystem import WorkspaceFS
@@ -767,9 +824,9 @@ def render_help() -> None:
 ### Как начать
 1. Создайте ключ хотя бы одного бесплатного варианта: Google AI Studio для Gemini или OpenRouter для моделей с суффиксом `:free`.
 2. Вставьте ключ слева и нажмите «Сохранить ключи».
-3. На вкладке «Запуск» оставьте пайплайн `code_only` и опишите задачу.
+3. В разделе «Запуск» оставьте пайплайн `code_only` и опишите задачу.
 
-Роли по умолчанию смотрят на Gemini с free tier, так что одного ключа Google достаточно. Платные модели выбираются на вкладке «Агенты».
+Роли по умолчанию смотрят на Gemini с free tier, так что одного ключа Google достаточно. Платные модели выбираются в разделе «Агенты».
 
 ### Где что лежит
 | Что | Файл |
@@ -817,21 +874,19 @@ def main() -> None:
     steps = list((pipelines.get(pipe_name) or {}).get("steps") or ["developer"])
     render_sidebar()
     render_header(catalog, active_agent_ids(cfg, steps))
-    tab_run, tab_agents, tab_models, tab_files, tab_ssh, tab_help = st.tabs(
-        ["Запуск", "Агенты", "Модели", "Файлы", "SSH", "Справка"]
-    )
-    with tab_run:
-        render_run(cfg, catalog, pipelines)
-    with tab_agents:
+    screen = resolve_screen(st.session_state.get("screen"))
+    if screen == "agents":
         render_agents(cfg, catalog, model_choices)
-    with tab_models:
+    elif screen == "models":
         render_models(catalog)
-    with tab_files:
+    elif screen == "files":
         render_files()
-    with tab_ssh:
+    elif screen == "ssh":
         render_ssh()
-    with tab_help:
+    elif screen == "help":
         render_help()
+    else:
+        render_run(cfg, catalog, pipelines)
 
 
 if __name__ == "__main__":

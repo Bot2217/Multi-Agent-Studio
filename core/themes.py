@@ -4,6 +4,15 @@ from __future__ import annotations
 
 DEFAULT_THEME = "paper"
 THEME_ORDER = ("paper", "night", "kiln", "pine")
+# Left-hand menu. First item is the home flow.
+SCREENS = (
+    ("run", "Запуск"),
+    ("agents", "Агенты"),
+    ("models", "Модели"),
+    ("files", "Файлы"),
+    ("ssh", "SSH"),
+    ("help", "Справка"),
+)
 
 # Shared badge pairs. Light sheets for paper/kiln, dark chips for night/pine.
 _LIGHT_BADGES = {
@@ -106,6 +115,14 @@ def resolve_theme(name: str | None) -> str:
     return DEFAULT_THEME
 
 
+def resolve_screen(name: str | None) -> str:
+    key = str(name or "").strip().lower()
+    known = {screen_id for screen_id, _label in SCREENS}
+    if key in known:
+        return key
+    return SCREENS[0][0]
+
+
 def _channel(value: int) -> float:
     channel = value / 255
     if channel <= 0.04045:
@@ -155,8 +172,8 @@ def theme_stylesheet(theme_id: str | None) -> str:
     )
     return f"""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,520;9..144,640&family=Outfit:wght@400;500;600&display=swap');
-/* theme:{theme["id"]} */
+@import url('https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Literata:opsz,wght@7..72,560;7..72,680&display=swap');
+/* theme:{theme["id"]} fonts:Literata,Golos Text,JetBrains Mono cyrillic */
 :root {{
   --bg: {theme["bg"]};
   --surface: {theme["surface"]};
@@ -168,11 +185,35 @@ def theme_stylesheet(theme_id: str | None) -> str:
   --on-accent: {theme["on_accent"]};
   --link: {theme["link"]};
   --note: {theme["note"]};
+  --danger: #8c2f24;
+  --on-danger: #fffaf3;
+  --font-display: Literata, Palatino, "Palatino Linotype", Georgia, serif;
+  --font-body: "Golos Text", "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --radius-s: 8px;
+  --radius-m: 14px;
+  --radius-l: 20px;
+  --radius-pill: 999px;
+  --shadow: 4px 4px 0 var(--line);
+  --type-xs: 0.75rem;
+  --type-sm: 0.875rem;
+  --type-md: 1rem;
+  --type-lg: 1.35rem;
+  --type-xl: 2.15rem;
+}}
+html, body, .stApp, [data-testid="stMarkdown"], p, li, label, input, textarea {{
+  font-family: var(--font-body);
 }}
 html, body, .stApp {{
   background: var(--bg);
   color: var(--ink);
-  font-family: Outfit, "Avenir Next", "Segoe UI", sans-serif;
+  font-size: var(--type-md);
 }}
 .stApp::before {{
   content: "";
@@ -185,9 +226,9 @@ html, body, .stApp {{
   z-index: 0;
 }}
 .block-container {{
-  padding-top: 1.4rem;
+  padding-top: var(--space-5);
   padding-bottom: 3.5rem;
-  max-width: 1120px;
+  max-width: 1080px;
   position: relative;
   z-index: 1;
 }}
@@ -200,23 +241,26 @@ header[data-testid="stHeader"] {{ background: transparent; }}
   background: var(--sidebar);
 }}
 h1, h2, h3, [data-testid="stMetricValue"] {{
-  font-family: Fraunces, "Iowan Old Style", Palatino, Georgia, serif;
+  font-family: var(--font-display);
   letter-spacing: -0.03em;
   color: var(--ink);
+  font-weight: 680;
 }}
-h2 {{
-  border-top: 1px solid var(--line);
-  padding-top: 0.85rem;
-  margin-top: 0.4rem;
-}}
+h1 {{ font-size: var(--type-xl); line-height: 1.05; }}
+h2 {{ font-size: var(--type-lg); margin: 0; border: 0; padding: 0; }}
+h3 {{ font-size: 1.05rem; }}
 p, li, label, .stMarkdown {{ color: var(--ink); }}
+code, pre, kbd, samp, [data-testid="stCode"], .stCode {{
+  font-family: var(--font-mono) !important;
+}}
 a {{ color: var(--link); }}
 .stCaption, [data-testid="stCaptionContainer"] p {{ color: var(--muted) !important; }}
 [data-testid="stMetric"] {{
   background: var(--surface);
   border: 1px solid var(--line);
-  border-radius: 16px;
-  padding: 0.45rem 0.85rem 0.6rem;
+  border-radius: var(--radius-m);
+  padding: var(--space-2) var(--space-4) var(--space-3);
+  box-shadow: var(--shadow);
   transition: border-color 160ms ease, transform 160ms ease;
 }}
 [data-testid="stMetric"]:hover {{
@@ -226,21 +270,56 @@ a {{ color: var(--link); }}
 [data-testid="stMetricLabel"] {{ color: var(--muted) !important; }}
 [data-testid="stMetricValue"] {{ color: var(--ink) !important; }}
 div[data-testid="stButton"] > button {{
-  border-radius: 999px;
-  font-family: Outfit, sans-serif;
-  font-weight: 560;
-  transition: transform 140ms ease, background 140ms ease, border-color 140ms ease;
+  border-radius: var(--radius-s);
+  font-family: var(--font-body);
+  font-weight: 600;
+  min-height: 42px;
+  padding: 0.35rem 0.9rem;
+  transition: transform 140ms ease, background 140ms ease, border-color 140ms ease, box-shadow 140ms ease;
 }}
 div[data-testid="stButton"] > button:hover {{ transform: translateY(-1px); }}
+div[data-testid="stButton"] > button:active {{ transform: translateY(0); }}
 div[data-testid="stButton"] > button[kind="primary"] {{
   background: var(--accent);
   color: var(--on-accent);
   border: 1px solid var(--accent);
+  box-shadow: var(--shadow);
 }}
 div[data-testid="stButton"] > button[kind="secondary"] {{
-  background: transparent;
+  background: var(--surface);
   color: var(--ink);
   border: 1px solid var(--line);
+}}
+div[data-testid="stButton"] > button[kind="tertiary"] {{
+  background: transparent;
+  color: var(--muted);
+  border: 1px solid transparent;
+  box-shadow: none;
+  min-height: 36px;
+}}
+div[data-testid="stButton"] > button[kind="tertiary"]:hover {{
+  color: var(--ink);
+  background: var(--surface);
+}}
+[class*="st-key-danger"] button {{
+  background: var(--danger) !important;
+  color: var(--on-danger) !important;
+  border-color: var(--danger) !important;
+}}
+[class*="st-key-nav_"] button {{
+  justify-content: flex-start;
+  text-align: left;
+  border-radius: var(--radius-s);
+  box-shadow: none;
+  min-height: 40px;
+}}
+[class*="st-key-nav_"] button[kind="primary"] {{
+  box-shadow: inset 4px 0 0 var(--on-accent);
+}}
+[class*="st-key-launch_run"] button {{
+  min-height: 52px;
+  font-size: 1.05rem;
+  border-radius: var(--radius-m);
 }}
 div[data-testid="stButton"] > button:focus-visible {{
   outline: 2px solid var(--accent);
@@ -250,24 +329,26 @@ div[data-testid="stButton"] > button:focus-visible {{
   background-color: var(--surface) !important;
   color: var(--ink) !important;
   border-color: var(--line) !important;
-  border-radius: 12px !important;
+  border-radius: var(--radius-s) !important;
 }}
-[data-baseweb="input"] input, textarea {{
+[data-baseweb="input"] input, textarea, [data-baseweb="select"] span {{
   color: var(--ink) !important;
   caret-color: var(--ink);
+  font-family: var(--font-body) !important;
+}}
+textarea {{ min-height: 140px; }}
+[data-testid="stSlider"] [role="slider"] {{
+  background: var(--accent) !important;
+  border: 2px solid var(--surface) !important;
 }}
 [data-testid="stExpander"] details {{
   background: var(--surface);
   border: 1px solid var(--line) !important;
-  border-radius: 16px;
+  border-radius: var(--radius-m);
+  box-shadow: var(--shadow);
 }}
-button[data-baseweb="tab"] {{
-  font-family: Outfit, sans-serif;
-  color: var(--muted);
-}}
-button[data-baseweb="tab"][aria-selected="true"] {{
-  color: var(--ink) !important;
-  border-bottom-color: var(--accent) !important;
+[data-testid="stExpander"] summary {{
+  font-weight: 600;
 }}
 [data-testid="stAlert"],
 [data-testid="stAlert"] * {{
@@ -277,26 +358,53 @@ button[data-baseweb="tab"][aria-selected="true"] {{
   background: #fff6e8 !important;
   border: 1px solid #e4d3b4 !important;
   border-left: 4px solid var(--accent) !important;
-  border-radius: 14px !important;
+  border-radius: var(--radius-m) !important;
 }}
-[data-testid="stDataFrame"] {{
+[data-testid="stSpinner"] {{ color: var(--accent); }}
+.sheet-wrap {{
+  max-height: 440px;
+  overflow: auto;
   border: 1px solid var(--line);
-  border-radius: 14px;
-  overflow: hidden;
+  border-radius: var(--radius-m);
   background: var(--surface);
+  box-shadow: var(--shadow);
 }}
-.mast {{ display: flex; gap: 0.95rem; align-items: center; margin: 0.2rem 0 0.9rem; }}
+table.sheet {{
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--type-sm);
+}}
+table.sheet th {{
+  position: sticky;
+  top: 0;
+  text-align: left;
+  font-family: var(--font-body);
+  font-size: var(--type-xs);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+  background: var(--sidebar);
+  padding: var(--space-3);
+  border-bottom: 1px solid var(--line);
+}}
+table.sheet td {{
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--line);
+  vertical-align: middle;
+}}
+table.sheet tbody tr:hover td {{ background: color-mix(in srgb, var(--accent) 8%, transparent); }}
+.mast {{ display: flex; gap: var(--space-4); align-items: center; margin: 0 0 var(--space-4); }}
 .mark {{
-  width: 56px; height: 56px; border-radius: 16px;
+  width: 52px; height: 52px; border-radius: var(--radius-m);
   background: var(--accent); color: var(--on-accent);
   display: grid; place-items: center;
-  font-family: Fraunces, Georgia, serif; font-weight: 640; font-size: 1.2rem;
-  box-shadow: 3px 3px 0 var(--line);
+  font-family: var(--font-display); font-weight: 680; font-size: 1.15rem;
+  box-shadow: var(--shadow);
 }}
 .kicker {{
-  font-family: Outfit, sans-serif;
-  font-size: 0.72rem; letter-spacing: 0.16em; text-transform: uppercase;
-  color: var(--accent); font-weight: 600; margin: 0 0 0.15rem;
+  font-family: var(--font-body);
+  font-size: var(--type-xs); letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--accent); font-weight: 700; margin: 0 0 var(--space-1);
 }}
 .studio-lead {{ color: var(--muted); margin: 0.25rem 0 0; font-size: 1.02rem; }}
 .mast h1 {{ margin: 0; font-size: 2.35rem; line-height: 0.95; }}
@@ -327,6 +435,34 @@ button[data-baseweb="tab"][aria-selected="true"] {{
   box-shadow: 4px 4px 0 var(--line);
 }}
 .slip p:last-child {{ margin-bottom: 0.7rem; }}
+.step {{
+  display: flex;
+  gap: var(--space-3);
+  align-items: flex-start;
+  margin: var(--space-5) 0 var(--space-3);
+}}
+.step-no {{
+  flex: none;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-s);
+  background: var(--accent);
+  color: var(--on-accent);
+  display: grid;
+  place-items: center;
+  font-family: var(--font-display);
+  font-weight: 680;
+}}
+.step h2 {{ font-size: var(--type-lg); }}
+.step-hint {{ color: var(--muted); margin: var(--space-1) 0 0; font-size: var(--type-sm); }}
+.st-key-result_panel {{
+  margin-top: var(--space-5);
+  padding: var(--space-4);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-m);
+  box-shadow: var(--shadow);
+}}
 @media (prefers-reduced-motion: reduce) {{
   .stApp::before {{ display: none; }}
   [data-testid="stMetric"], .chip, div[data-testid="stButton"] > button {{
