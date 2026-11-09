@@ -56,7 +56,10 @@ cp .env.example .env               # вставьте ключи
 streamlit run app.py               # http://localhost:8501
 ```
 
-Windows: двойной щелчок по `start.bat` (git pull, зависимости, Streamlit).  
+Windows: двойной щелчок по `start.bat`. Скрипт подтягивает `main`, создаёт `.venv`, ставит зависимости и запускает Streamlit на http://localhost:8501. Нужен Python 3 в `PATH` (`python` или `py`). Только подготовка, без окна: `start.bat setup`.
+
+`start.bat` рассчитан на русскую консоль. Git хранит его в UTF-8, а в рабочую копию записывает в кодировке CP866 и с концами строк CRLF. Так `cmd.exe` не отрезает первый байт каждой строки. Не пересохраняйте файл как UTF-8 и не добавляйте `chcp 65001`.
+
 Linux и macOS: `./start.sh` делает то же самое.
 
 Командная строка, без окна:
@@ -211,6 +214,6 @@ CI на GitHub Actions гоняет `ruff format --check`, `ruff check` и `pyte
 
 Multi-Agent Studio is a local Streamlit app: several roles share a task, each with its own model, and the model catalog records whether a model is free or paid.
 
-Quick start: create a virtualenv, `pip install -r requirements.txt`, copy `.env.example` to `.env`, then `streamlit run app.py`. The default roles use Gemini’s free tier (`GOOGLE_API_KEY`). OpenRouter `:free` models and local Ollama tags need no per-token fee. Paid Claude, GPT, Grok, DeepSeek, Mistral, Groq, and Cerebras models are in the same picker.
+Quick start: create a virtualenv, `pip install -r requirements.txt`, copy `.env.example` to `.env`, then `streamlit run app.py`. On Windows, double-click `start.bat` (`start.bat setup` only installs dependencies). Git checks that file out as CP866 with CRLF so cmd.exe does not split the commands. The default roles use Gemini’s free tier (`GOOGLE_API_KEY`). OpenRouter `:free` models and local Ollama tags need no per-token fee. Paid Claude, GPT, Grok, DeepSeek, Mistral, Groq, and Cerebras models are in the same picker.
 
 Prices were checked on **9 November 2026**. The Russian table above is the full list. `unknown` means the official number could not be verified and was not guessed. The left menu replaces stock tabs. Headings use Literata, body text Golos Text, and code JetBrains Mono, all with Cyrillic. The sidebar switches four themes (Paper, Night, Kiln, Pine); the choice is stored in `user_settings.json`. CI runs Ruff and pytest. See `config/models_catalog.yaml` for the source URL on every row.
