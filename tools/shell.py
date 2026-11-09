@@ -5,8 +5,8 @@ Local shell / bash / cmd execution with timeout and optional allowlist.
 from __future__ import annotations
 
 import os
-import subprocess
 import shlex
+import subprocess
 from pathlib import Path
 from typing import Optional
 
@@ -47,10 +47,7 @@ class ShellRunner:
             first = shlex.split(cmd)[0] if cmd else ""
             base = Path(first).name
             if base not in self.allowlist and first not in self.allowlist:
-                return (
-                    f"Command not in allowlist: {base}\n"
-                    f"Allowed: {', '.join(self.allowlist)}"
-                )
+                return f"Command not in allowlist: {base}\nAllowed: {', '.join(self.allowlist)}"
 
         workdir = Path(cwd).resolve() if cwd else self.cwd
         if not workdir.exists():

@@ -10,10 +10,9 @@ import re
 from typing import Any, Callable, Optional
 
 from tools.filesystem import WorkspaceFS
-from tools.shell import ShellRunner
-from tools.remote import RemoteManager, RemoteDevice
 from tools.power import PowerManager
-
+from tools.remote import RemoteDevice, RemoteManager
+from tools.shell import ShellRunner
 
 DEFAULT_SYSTEM = """Ты локальный агент-разработчик на компьютере пользователя (как Claude Code).
 
@@ -93,12 +92,12 @@ class AgentRuntime:
             self._tools = {k: v for k, v in all_tools.items() if k in names}
 
         tool_list = "\n".join(f"- {n}" for n in self._tools if n != "finish")
-        tool_list += "\n- finish — {\"summary\": \"...\"}"
+        tool_list += '\n- finish — {"summary": "..."}'
 
         base = system_prompt or DEFAULT_SYSTEM
         self.system_prompt = (
             base.strip()
-            + "\n\nФормат вызова инструмента:\n```tool\n{\"name\": \"...\", \"args\": {...}}\n```\n"
+            + '\n\nФормат вызова инструмента:\n```tool\n{"name": "...", "args": {...}}\n```\n'
             + f"\nДоступные инструменты:\n{tool_list}\n"
         )
 

@@ -1,203 +1,1079 @@
-# Каталог моделей для Multi-Agent Studio (окт 2026)
-# free_tier: true = есть бесплатный квотный доступ у провайдера (лимиты RPM/RPD)
-
+# Каталог моделей Multi-Agent Studio
+# Сверено по официальным страницам и живому API OpenRouter.
+# billing: free | freemium | paid | local | unknown
+# price_* — USD за 1M токенов. price_status: unknown значит цифру не выдумывали.
+# freemium: есть free tier, в полях цены — платный standard-тариф.
+# last_verified у записей: 2026-11-09
+verified_on: "2026-11-09"
+currency: USD
 models:
-  gemini_25_flash:
-    litellm: gemini/gemini-2.5-flash
-    name: Gemini 2.5 Flash
-    provider: Google
-    free_tier: true
-    price_note: free tier / иначе ~$0.30
-    context: 1M
-    best_for: быстрые задачи, исследование, черновики
-    summary: Быстрая модель Google. На AI Studio часто доступна бесплатно с лимитами RPM/RPD.
-
   gemini_25_flash_lite:
-    litellm: gemini/gemini-2.5-flash-lite
-    name: Gemini 2.5 Flash-Lite
-    provider: Google
+    litellm: "gemini/gemini-2.5-flash-lite"
+    name: "Gemini 2.5 Flash-Lite"
+    provider: "Google"
+    billing: "freemium"
     free_tier: true
-    price_note: free tier / иначе ~$0.10
-    context: 1M
-    best_for: дешёвые массовые вызовы
-    summary: Самый лёгкий Flash. Хорош для простых шагов пайплайна.
-
+    price_status: "known"
+    price_input_per_1m: 0.1
+    price_output_per_1m: 0.4
+    price_note: "Free tier: $0 в лимитах AI Studio (контент может идти на улучшение продуктов). Paid standard, текст/изображение/видео: $0.10 / $0.40 за 1M. Аудио на входе дороже ($0.30)."
+    context: "unknown"
+    context_tokens: null
+    best_for: "дешёвые массовые шаги, черновики"
+    summary: "Самый дешёвый актуальный Flash-Lite в прайсе Gemini API. Окно контекста на странице цен не указано."
+    source: "https://ai.google.dev/gemini-api/docs/pricing"
+    last_verified: "2026-11-09"
+    availability: "available"
+    runnable: true
+  gemini_25_flash:
+    litellm: "gemini/gemini-2.5-flash"
+    name: "Gemini 2.5 Flash"
+    provider: "Google"
+    billing: "freemium"
+    free_tier: true
+    price_status: "known"
+    price_input_per_1m: 0.3
+    price_output_per_1m: 2.5
+    price_note: "Free tier: $0 в лимитах AI Studio. Paid standard, текст/изображение/видео: $0.30 / $2.50 за 1M. Аудио на входе $1.00. Страница цен прямо указывает окно 1M."
+    context: "1M"
+    context_tokens: 1000000
+    best_for: "исследование, быстрые агентные шаги"
+    summary: "Гибридная reasoning-модель Google с подтверждённым окном 1M и free tier."
+    source: "https://ai.google.dev/gemini-api/docs/pricing"
+    last_verified: "2026-11-09"
+    availability: "available"
+    runnable: true
   gemini_25_pro:
-    litellm: gemini/gemini-2.5-pro
-    name: Gemini 2.5 Pro
-    provider: Google
+    litellm: "gemini/gemini-2.5-pro"
+    name: "Gemini 2.5 Pro"
+    provider: "Google"
+    billing: "freemium"
     free_tier: true
-    price_note: free tier (лимиты) / платный выше
-    context: 1M
-    best_for: анализ, длинный контекст
-    summary: Сильнее Flash. Free tier есть, но жёстче лимиты.
-
+    price_status: "known"
+    price_input_per_1m: 1.25
+    price_output_per_1m: 10
+    price_note: "Free tier: $0 в лимитах (они жёстче, чем у Flash). Paid standard для промпта до 200k: $1.25 / $10 за 1M; длиннее 200k: $2.50 / $15. Точный размер окна на странице цен не указан."
+    context: "unknown"
+    context_tokens: null
+    best_for: "анализ и сложные задачи на free tier"
+    summary: "Pro-модель с free tier. В каталоге указана цена короткого промпта; выше 200k токенов тариф выше."
+    source: "https://ai.google.dev/gemini-api/docs/pricing"
+    last_verified: "2026-11-09"
+    availability: "available"
+    runnable: true
+  gemini_35_flash_lite:
+    litellm: "gemini/gemini-3.5-flash-lite"
+    name: "Gemini 3.5 Flash-Lite"
+    provider: "Google"
+    billing: "freemium"
+    free_tier: true
+    price_status: "known"
+    price_input_per_1m: 0.3
+    price_output_per_1m: 2.5
+    price_note: "Free tier: $0. Paid standard: $0.30 / $2.50 за 1M (текст, изображение, видео, аудио). Окно контекста на странице цен не указано."
+    context: "unknown"
+    context_tokens: null
+    best_for: "объёмные простые шаги новой линейки Flash-Lite"
+    summary: "Более новая Flash-Lite с free tier. По paid-тарифу совпадает с Gemini 2.5 Flash, не с 2.5 Flash-Lite."
+    source: "https://ai.google.dev/gemini-api/docs/pricing"
+    last_verified: "2026-11-09"
+    availability: "available"
+    runnable: true
   gemini_38_flash:
-    litellm: gemini/gemini-3.8-flash
-    name: Gemini 3.8 Flash
-    provider: Google
+    litellm: "gemini/gemini-3.8-flash"
+    name: "Gemini 3.8 Flash"
+    provider: "Google"
+    billing: "freemium"
     free_tier: true
-    price_note: free tier
-    context: 1M
-    best_for: актуальный бесплатный Flash
-    summary: Актуальная линейка Flash 2026 с free tier в AI Studio.
-
-  claude_haiku_45:
-    litellm: anthropic/claude-haiku-4-5
-    name: Claude Haiku 4.5
-    provider: Anthropic
+    price_status: "known"
+    price_input_per_1m: 0.75
+    price_output_per_1m: 3.75
+    price_note: "Free tier: $0. Paid standard до 31 декабря 2026: $0.75 / $3.75 за 1M; с 1 января 2027: $1.50 / $7.50. Окно контекста на странице цен не указано."
+    context: "unknown"
+    context_tokens: null
+    best_for: "основной бесплатный агент для кода и планов"
+    summary: "Актуальный Flash Google для длинных агентных задач. Цена в каталоге — вводный paid-тариф до конца 2026 года."
+    source: "https://ai.google.dev/gemini-api/docs/pricing"
+    last_verified: "2026-11-09"
+    availability: "available"
+    runnable: true
+  gemini_4_argon:
+    litellm: "gemini/gemini-4-argon"
+    name: "Gemini 4 Argon"
+    provider: "Google"
+    billing: "paid"
     free_tier: false
-    price_note: ~$1 / $5
-    context: 200K
-    best_for: быстрый код, дешёвый Claude
-    summary: Самый дешёвый Claude. Нет бесплатного API-тира.
-
-  claude_sonnet_45:
-    litellm: anthropic/claude-sonnet-4-5
-    name: Claude Sonnet 4.5
-    provider: Anthropic
-    free_tier: false
-    price_note: ~$3 / $15
-    context: 1M
-    best_for: разработка, баланс цена/качество
-    summary: Основной рабочий Claude для кода и агентов.
-
-  claude_sonnet_55:
-    litellm: anthropic/claude-sonnet-5-5
-    name: Claude Sonnet 5.5
-    provider: Anthropic
-    free_tier: false
-    price_note: ~$2 / $10
-    context: 1M
-    best_for: код и сложные задачи
-    summary: Новое поколение Sonnet (2026).
-
-  claude_opus_45:
-    litellm: anthropic/claude-opus-4-5
-    name: Claude Opus 4.5
-    provider: Anthropic
-    free_tier: false
-    price_note: ~$5 / $25
-    context: 200K
-    best_for: архитектура, сложное ревью
-    summary: Топовая модель Anthropic для трудных задач.
-
-  claude_opus_55:
-    litellm: anthropic/claude-opus-5-5
-    name: Claude Opus 5.5
-    provider: Anthropic
-    free_tier: false
-    price_note: ~$4 / $20
-    context: 1M
-    best_for: максимальное качество
-    summary: Opus нового поколения, дороже, сильнее в рассуждениях.
-
-  gpt_4o:
-    litellm: openai/gpt-4o
-    name: GPT-4o
-    provider: OpenAI
-    free_tier: false
-    price_note: платный
-    context: 128K
-    best_for: универсальные задачи
-    summary: Классическая мультимодальная модель OpenAI.
-
+    price_status: "known"
+    price_input_per_1m: 2
+    price_output_per_1m: 10
+    price_note: "Free tier нет: страница цен прямо пишет, что модель недоступна на Free. Standard до 30 ноября 2026: $2 / $10 за 1M; с 1 декабря 2026: $4 / $20. Окно контекста отдельно не указано (в описании есть длинная генерация до 1M)."
+    context: "unknown"
+    context_tokens: null
+    best_for: "сложные инженерные и научные задачи"
+    summary: "Флагман Gemini. Платный с первого токена, включая thinking-токены."
+    source: "https://ai.google.dev/gemini-api/docs/pricing"
+    last_verified: "2026-11-09"
+    availability: "available"
+    runnable: true
   gpt_4o_mini:
-    litellm: openai/gpt-4o-mini
-    name: GPT-4o Mini
-    provider: OpenAI
+    litellm: "openai/gpt-4o-mini"
+    name: "GPT-4o mini"
+    provider: "OpenAI"
+    billing: "paid"
     free_tier: false
-    price_note: ~$0.15 / $0.60
-    context: 128K
-    best_for: дешёвые шаги пайплайна
-    summary: Лёгкая и дешёвая OpenAI-модель.
-
+    price_status: "known"
+    price_input_per_1m: 0.15
+    price_output_per_1m: 0.6
+    price_note: "Платный API, free tier нет. $0.15 / $0.60 за 1M. Статус карточки: Deprecated."
+    context: "128K"
+    context_tokens: 128000
+    best_for: "дешёвые короткие шаги OpenAI"
+    summary: "Маленькая мультимодальная модель. Карточка помечает её как deprecated, вызовы chat completions ещё поддерживаются."
+    source: "https://developers.openai.com/api/docs/models/gpt-4o-mini"
+    last_verified: "2026-11-09"
+    availability: "deprecated"
+    runnable: true
+  gpt_4o:
+    litellm: "openai/gpt-4o"
+    name: "GPT-4o"
+    provider: "OpenAI"
+    billing: "paid"
+    free_tier: false
+    price_status: "known"
+    price_input_per_1m: 2.5
+    price_output_per_1m: 10
+    price_note: "Платный API. $2.50 / $10 за 1M. Статус карточки: Deprecated. Окно 128K."
+    context: "128K"
+    context_tokens: 128000
+    best_for: "универсальные мультимодальные задачи"
+    summary: "Предыдущий флагман Omni. Для новых задач OpenAI рекомендует линейку GPT-6."
+    source: "https://developers.openai.com/api/docs/models/gpt-4o"
+    last_verified: "2026-11-09"
+    availability: "deprecated"
+    runnable: true
   gpt_41:
-    litellm: openai/gpt-4.1
-    name: GPT-4.1
-    provider: OpenAI
+    litellm: "openai/gpt-4.1"
+    name: "GPT-4.1"
+    provider: "OpenAI"
+    billing: "paid"
     free_tier: false
-    price_note: платный
-    context: 1M
-    best_for: код, длинный контекст
-    summary: Сильная модель для разработки с большим контекстом.
-
+    price_status: "known"
+    price_input_per_1m: 2
+    price_output_per_1m: 8
+    price_note: "Платный API. $2 / $8 за 1M. Окно 1 047 576 токенов. Статус карточки: Deprecated."
+    context: "1 047 576"
+    context_tokens: 1047576
+    best_for: "инструкции и tool calling без reasoning-шага"
+    summary: "Сильная не-reasoning модель с длинным контекстом. Карточка помечает её как deprecated."
+    source: "https://developers.openai.com/api/docs/models/gpt-4.1"
+    last_verified: "2026-11-09"
+    availability: "deprecated"
+    runnable: true
   gpt_5_mini:
-    litellm: openai/gpt-5-mini
-    name: GPT-5 Mini
-    provider: OpenAI
+    litellm: "openai/gpt-5-mini"
+    name: "GPT-5 mini"
+    provider: "OpenAI"
+    billing: "paid"
     free_tier: false
-    price_note: ~$0.25 / $2
-    context: 272K
-    best_for: баланс цена/качество OpenAI
-    summary: Компактная линейка GPT-5.
-
+    price_status: "known"
+    price_input_per_1m: 0.25
+    price_output_per_1m: 2
+    price_note: "Платный API. $0.25 / $2 за 1M. Окно 400K, максимум входа 272K. Статус карточки: Deprecated. Прежняя пометка каталога «272K контекста» относилась к лимиту входа, не к окну."
+    context: "400K"
+    context_tokens: 400000
+    best_for: "недорогие reasoning-шаги OpenAI"
+    summary: "Компактная GPT-5. Для новых объёмных задач карточка советует GPT-5.6 Terra, но mini ещё в прайсе."
+    source: "https://developers.openai.com/api/docs/models/gpt-5-mini"
+    last_verified: "2026-11-09"
+    availability: "deprecated"
+    runnable: true
   gpt_5:
-    litellm: openai/gpt-5
-    name: GPT-5
-    provider: OpenAI
+    litellm: "openai/gpt-5"
+    name: "GPT-5"
+    provider: "OpenAI"
+    billing: "paid"
     free_tier: false
-    price_note: ~$1.25 / $10
-    context: 272K
-    best_for: сложные задачи OpenAI
-    summary: Основная GPT-5.
-
+    price_status: "known"
+    price_input_per_1m: 1.25
+    price_output_per_1m: 10
+    price_note: "Платный API. $1.25 / $10 за 1M. Окно 400K, максимум входа 272K. Статус карточки: Deprecated."
+    context: "400K"
+    context_tokens: 400000
+    best_for: "код и агентные задачи предыдущего поколения"
+    summary: "Предыдущая reasoning-модель OpenAI. Карточка рекомендует GPT-6 Astra для новых задач."
+    source: "https://developers.openai.com/api/docs/models/gpt-5"
+    last_verified: "2026-11-09"
+    availability: "deprecated"
+    runnable: true
   gpt_6_luna:
-    litellm: openai/gpt-6-luna
-    name: GPT-6 Luna
-    provider: OpenAI
+    litellm: "openai/gpt-6-luna"
+    name: "GPT-6 Luna"
+    provider: "OpenAI"
+    billing: "paid"
     free_tier: false
-    price_note: ~$0.10 / $0.50
-    context: 922K
-    best_for: дешёвый длинный контекст
-    summary: Недорогая модель OpenAI 2026 с огромным контекстом.
-
-  grok_4:
-    litellm: xai/grok-4
-    name: Grok 4
-    provider: xAI
+    price_status: "known"
+    price_input_per_1m: 0.1
+    price_output_per_1m: 0.5
+    price_note: "Платный API, это не free tier. Standard при входе до 272K: $0.10 / $0.50 за 1M. Выше 272K вход x2 и выход x1.5 на весь запрос. Окно 1.05M (прежние 922K в каталоге — это не окно Luna)."
+    context: "1.05M"
+    context_tokens: 1050000
+    best_for: "дешёвые объёмные задачи OpenAI"
+    summary: "Самая экономичная модель линейки GPT-6. Цена в каталоге — standard short context."
+    source: "https://developers.openai.com/api/docs/pricing"
+    last_verified: "2026-11-09"
+    availability: "available"
+    runnable: true
+  gpt_61_terra:
+    litellm: "openai/gpt-6.1-terra"
+    name: "GPT-6.1 Terra"
+    provider: "OpenAI"
+    billing: "paid"
     free_tier: false
-    price_note: платный
-    context: большой
-    best_for: ревью, альтернативный взгляд
-    summary: Модель xAI. Бесплатного API-тира нет.
-
-  grok_code_fast:
-    litellm: xai/grok-code-fast-1
-    name: Grok Code Fast
-    provider: xAI
+    price_status: "known"
+    price_input_per_1m: 1
+    price_output_per_1m: 5
+    price_note: "Платный API. Standard до 272K входа: $1 / $5 за 1M. Длинный контекст дороже (вход x2, выход x1.5). Окно 1.05M."
+    context: "1.05M"
+    context_tokens: 1050000
+    best_for: "быстрые визуальные и агентные задачи"
+    summary: "Быстрая модель GPT-6.1 между Luna и Sol. Цена — standard short context."
+    source: "https://developers.openai.com/api/docs/pricing"
+    last_verified: "2026-11-09"
+    availability: "available"
+    runnable: true
+  gpt_61_sol:
+    litellm: "openai/gpt-6.1-sol"
+    name: "GPT-6.1 Sol"
+    provider: "OpenAI"
+    billing: "paid"
     free_tier: false
-    price_note: ~$1 / $2
-    context: 256K
-    best_for: быстрый код
-    summary: Специализация на коде, относительно недорого у xAI.
-
-  deepseek_chat:
-    litellm: deepseek/deepseek-chat
-    name: DeepSeek Chat
-    provider: DeepSeek
+    price_status: "known"
+    price_input_per_1m: 2
+    price_output_per_1m: 10
+    price_note: "Платный API. Standard до 272K входа: $2 / $10 за 1M. Выше 272K вход x2 и выход x1.5. Окно 1.05M, максимум входа 922K, максимум выхода 128K."
+    context: "1.05M"
+    context_tokens: 1050000
+    best_for: "код, computer use, сложная работа"
+    summary: "Близкая к Astra модель по меньшей цене. Карточка модели подтверждает ID gpt-6.1-sol."
+    source: "https://developers.openai.com/api/docs/models/gpt-6.1-sol"
+    last_verified: "2026-11-09"
+    availability: "available"
+    runnable: true
+  gpt_6_astra:
+    litellm: "openai/gpt-6-astra"
+    name: "GPT-6 Astra"
+    provider: "OpenAI"
+    billing: "paid"
     free_tier: false
-    price_note: ~$0.28 / $0.42 (очень дёшево)
-    context: 128K
-    best_for: код и общий чат за копейки
-    summary: Дешёвый сильный API. Иногда есть стартовый грант токенов, не постоянный free tier.
-
-  deepseek_v4_flash:
-    litellm: deepseek/deepseek-v4-flash
-    name: DeepSeek V4 Flash
-    provider: DeepSeek
+    price_status: "known"
+    price_input_per_1m: 10
+    price_output_per_1m: 50
+    price_note: "Платный API. Standard до 272K входа: $10 / $50 за 1M. Длинный контекст: $20 / $75. Окно 1.05M."
+    context: "1.05M"
+    context_tokens: 1050000
+    best_for: "самые трудные задачи OpenAI"
+    summary: "Флагман OpenAI на ноябрь 2026. Цена в каталоге — standard short context."
+    source: "https://developers.openai.com/api/docs/pricing"
+    last_verified: "2026-11-09"
+    availability: "available"
+    runnable: true
+  claude_haiku_45:
+    litellm: "anthropic/claude-haiku-4-5"
+    name: "Claude Haiku 4.5"
+    provider: "Anthropic"
+    billing: "paid"
     free_tier: false
-    price_note: ~$0.30 / $1.20
-    context: 1M
-    best_for: быстрый код, длинный контекст
-    summary: Актуальный Flash от DeepSeek, отличная цена.
-
-  deepseek_r1:
-    litellm: deepseek/deepseek-reasoner
-    name: DeepSeek R1 (Reasoner)
-    provider: DeepSeek
+    price_status: "known"
+    price_input_per_1m: 1
+    price_output_per_1m: 5
+    price_note: "Платный API, бесплатного тира нет. $1 / $5 за 1M. Снимок claude-haiku-4-5-20251001 в статусе Active. Окно контекста в обзоре текущей линейки не указано."
+    context: "unknown"
+    context_tokens: null
+    best_for: "быстрый дешёвый Claude"
+    summary: "Haiku предыдущего поколения, всё ещё Active. Алиас claude-haiku-4-5."
+    source: "https://platform.claude.com/docs/en/about-claude/pricing"
+    last_verified: "2026-11-09"
+    availability: "available"
+    runnable: true
+  claude_sonnet_45:
+    litellm: "anthropic/claude-sonnet-4-5"
+    name: "Claude Sonnet 4.5"
+    provider: "Anthropic"
+    billing: "paid"
     free_tier: false
-    price_note: ~$0.55 / $2.19
-    context: 64K
-    best_for: рассуждения, сложный анализ
-    summary: Reasoning-модель DeepSeek.
+    price_status: "known"
+    price_input_per_1m: 3
+    price_output_per_1m: 15
+    price_note: "Платный API. $3 / $15 за 1M. Снимок claude-sonnet-4-5-20250929 deprecated с 30 сентября 2026, вывод из API 30 ноября 2026. Замена: claude-sonnet-5-5. Окно в обзоре текущей линейки не указано."
+    context: "unknown"
+    context_tokens: null
+    best_for: "старые пайплайны, которые ещё не переехали"
+    summary: "Модель выводится 30 ноября 2026. Для новой работы берите Claude Sonnet 5.5."
+    source: "https://platform.claude.com/docs/en/about-claude/model-deprecations"
+    last_verified: "2026-11-09"
+    availability: "deprecated"
+    runnable: true
+  claude_opus_45:
+    litellm: "anthropic/claude-opus-4-5"
+    name: "Claude Opus 4.5"
+    provider: "Anthropic"
+    billing: "paid"
+    free_tier: false
+    price_status: "known"
+    price_input_per_1m: 5
+    price_output_per_1m: 25
+    price_note: "Платный API. $5 / $25 за 1M. Снимок claude-opus-4-5-20251101 в статусе Active. Окно в обзоре текущей линейки не указано."
+    context: "unknown"
+    context_tokens: null
+    best_for: "архитектура и ревью, если нужен Opus 4.5"
+    summary: "Предыдущий Opus, всё ещё Active. Текущий выбор для новых задач — Opus 5.5."
+    source: "https://platform.claude.com/docs/en/about-claude/pricing"
+    last_verified: "2026-11-09"
+    availability: "available"
+    runnable: true
+  claude_haiku_55:
+    litellm: "anthropic/claude-haiku-5-5"
+    name: "Claude Haiku 5.5"
+    provider: "Anthropic"
+    billing: "paid"
+    free_tier: false
+    price_status: "known"
+    price_input_per_1m: 0.1
+    price_output_per_1m: 0.5
+    price_note: "Платный API, free tier нет. Для промпта до 100k токенов: $0.10 / $0.50 за 1M; длиннее 100k: $0.50 / $2.50. Окно 1M."
+    context: "1M"
+    context_tokens: 1000000
+    best_for: "классификация, маршрутизация, дешёвые шаги"
+    summary: "Самый быстрый актуальный Claude. Цена в каталоге — тариф короткого промпта."
+    source: "https://platform.claude.com/docs/en/about-claude/pricing"
+    last_verified: "2026-11-09"
+    availability: "available"
+    runnable: true
+  claude_sonnet_55:
+    litellm: "anthropic/claude-sonnet-5-5"
+    name: "Claude Sonnet 5.5"
+    provider: "Anthropic"
+    billing: "paid"
+    free_tier: false
+    price_status: "known"
+    price_input_per_1m: 2
+    price_output_per_1m: 10
+    price_note: "Платный API. $2 / $10 за 1M. Окно 1M, максимум выхода 128K. Активная модель."
+    context: "1M"
+    context_tokens: 1000000
+    best_for: "код и агенты, баланс цены и качества"
+    summary: "Рекомендуемая рабочая модель Claude: быстрее флагмана и дешевле Sonnet 4.5."
+    source: "https://platform.claude.com/docs/en/models/overview"
+    last_verified: "2026-11-09"
+    availability: "available"
+    runnable: true
+  claude_opus_55:
+    litellm: "anthropic/claude-opus-5-5"
+    name: "Claude Opus 5.5"
+    provider: "Anthropic"
+    billing: "paid"
+    free_tier: false
+    price_status: "known"
+    price_input_per_1m: 4
+    price_output_per_1m: 20
+    price_note: "Платный API. $4 / $20 за 1M. Окно 1M. Активная модель, старт для большинства серьёзных задач по обзору Anthropic."
+    context: "1M"
+    context_tokens: 1000000
+    best_for: "длинные агентные задачи и код"
+    summary: "Основной Opus текущей линейки. Дешевле Opus 4.5 при окне 1M."
+    source: "https://platform.claude.com/docs/en/models/overview"
+    last_verified: "2026-11-09"
+    availability: "available"
+    runnable: true
+  claude_fable_52:
+    litellm: "anthropic/claude-fable-5-2"
+    name: "Claude Fable 5.2"
+    provider: "Anthropic"
+    billing: "paid"
+    free_tier: false
+    price_status: "known"
+    price_input_per_1m: 8
+    price_output_per_1m: 40
+    price_note: "Платный API. $8 / $40 за 1M. Окно 1M. Бесплатного тира нет."
+    context: "1M"
+    context_tokens: 1000000
+    best_for: "самые трудные рассуждения и длинные агенты"
+    summary: "Топовая модель Anthropic, когда Opus 5.5 уже не хватает."
+    source: "https://platform.claude.com/docs/en/models/overview"
+    last_verified: "2026-11-09"
+    availability: "available"
+    runnable: true
+  grok_47:
+    litellm: "xai/grok-4.7"
+    name: "Grok 4.7"
+    provider: "xAI"
+    billing: "paid"
+    free_tier: false
+    price_status: "known"
+    price_input_per_1m: 2
+    price_output_per_1m: 6
+    price_note: "Платный API, бесплатного тира нет. До 200k токенов промпта: $2 / $6 за 1M (кэш входа $0.50). Начиная с 200k весь запрос считается по $4 / $12. Окно 500k. Страница docs.x.ai/developers/models/grok-4 на 2026-11-09 отдаёт 404: ID grok-4 в каталоге заменён на grok-4.7."
+    context: "500K"
+    context_tokens: 500000
+    best_for: "код, ревью, агентные вызовы"
+    summary: "Текущий флагман xAI. Цена в каталоге — короткий контекст."
+    source: "https://docs.x.ai/developers/pricing"
+    last_verified: "2026-11-09"
+    availability: "available"
+    runnable: true
+  grok_45:
+    litellm: "xai/grok-4.5"
+    name: "Grok 4.5"
+    provider: "xAI"
+    billing: "paid"
+    free_tier: false
+    price_status: "known"
+    price_input_per_1m: 2
+    price_output_per_1m: 6
+    price_note: "Платный API. До 200k: $2 / $6 за 1M (кэш входа $0.30). Выше 200k: $4 / $12. Окно 500k."
+    context: "500K"
+    context_tokens: 500000
+    best_for: "код и агентные задачи предыдущей ревизии"
+    summary: "Предыдущий Grok 4.5, всё ещё в прайсе. Кэш входа дешевле, чем у 4.7."
+    source: "https://docs.x.ai/developers/pricing"
+    last_verified: "2026-11-09"
+    availability: "available"
+    runnable: true
+  grok_43:
+    litellm: "xai/grok-4.3"
+    name: "Grok 4.3"
+    provider: "xAI"
+    billing: "paid"
+    free_tier: false
+    price_status: "known"
+    price_input_per_1m: 1.25
+    price_output_per_1m: 2.5
+    price_note: "Платный API. До 200k: $1.25 / $2.50 за 1M. Выше 200k: $2.50 / $5. Окно 1M. Сюда же с 15 мая 2026 уводят часть старых slug, включая grok-4-0709."
+    context: "1M"
+    context_tokens: 1000000
+    best_for: "длинный контекст xAI по меньшей цене"
+    summary: "Модель с окном 1M. Короткая цена ниже, чем у Grok 4.7."
+    source: "https://docs.x.ai/developers/pricing"
+    last_verified: "2026-11-09"
+    availability: "available"
+    runnable: true
+  grok_build:
+    litellm: "xai/grok-build-0.1"
+    name: "Grok Build 0.1"
+    provider: "xAI"
+    billing: "paid"
+    free_tier: false
+    price_status: "known"
+    price_input_per_1m: 1
+    price_output_per_1m: 2
+    price_note: "Платный API. До 200k: $1 / $2 за 1M (кэш входа $0.20). Выше 200k: $2 / $4. Окно 256k. grok-code-fast-1 снят 15 мая 2026 и является алиасом этой модели, а не отдельным тарифом $1/$2 «как раньше» без оговорки про редирект."
+    context: "256K"
+    context_tokens: 256000
+    best_for: "агентный кодинг"
+    summary: "Кодовая модель xAI. Старый ID grok-code-fast-1 сюда и маршрутизируется."
+    source: "https://docs.x.ai/developers/models/grok-build-0.1"
+    last_verified: "2026-11-09"
+    availability: "alias"
+    runnable: true
+  deepseek_flash:
+    litellm: "deepseek/deepseek-flash"
+    name: "DeepSeek Flash"
+    provider: "DeepSeek"
+    billing: "paid"
+    free_tier: false
+    price_status: "known"
+    price_input_per_1m: 0.15
+    price_output_per_1m: 0.6
+    price_note: "Постоянного free tier в API-прайсе нет (списывается баланс, грант если он есть — первым). Цена в каталоге: off-peak cache miss $0.15 / $0.60 за 1M. Peak (пн–пт 01:00–04:00 и 06:00–10:00 UTC, кроме праздников КНР) вдвое дороже: $0.30 / $1.20. Cache hit off-peak $0.003. Окно 1M, выход до 384K. Устаревшие deepseek-chat и deepseek-reasoner в текущей таблице моделей не перечислены."
+    context: "1M"
+    context_tokens: 1000000
+    best_for: "дешёвый сильный код и чат"
+    summary: "Актуальный ID deepseek-flash, под капотом DeepSeek-V4.1-Flash-1017. Старые имена deepseek-v4-flash ещё принимаются и тарифицируются как Flash."
+    source: "https://api-docs.deepseek.com/quick_start/pricing/"
+    last_verified: "2026-11-09"
+    availability: "available"
+    runnable: true
+  deepseek_v4_pro:
+    litellm: "deepseek/deepseek-v4-pro"
+    name: "DeepSeek V4 Pro"
+    provider: "DeepSeek"
+    billing: "paid"
+    free_tier: false
+    price_status: "known"
+    price_input_per_1m: 0.66
+    price_output_per_1m: 1.98
+    price_note: "Платный API. Off-peak cache miss: $0.66 / $1.98 за 1M. Peak вдвое дороже. Cache hit off-peak $0.022. Окно 1M. Документация предупреждает, что запросы deepseek-v4-pro могут уводиться на Flash до выхода V4.1-Pro."
+    context: "1M"
+    context_tokens: 1000000
+    best_for: "более тяжёлые задачи DeepSeek"
+    summary: "Вторая модель текущего прайса DeepSeek. Для большинства шагов дешевле и новее Flash."
+    source: "https://api-docs.deepseek.com/quick_start/pricing/"
+    last_verified: "2026-11-09"
+    availability: "available"
+    runnable: true
+  groq_gpt_oss_20b:
+    litellm: "groq/openai/gpt-oss-20b"
+    name: "GPT-OSS 20B (Groq)"
+    provider: "Groq"
+    billing: "paid"
+    free_tier: false
+    price_status: "known"
+    price_input_per_1m: 0.075
+    price_output_per_1m: 0.3
+    price_note: "On-demand с docs/models: $0.075 / $0.30 за 1M, окно 131 072. План Free за $0 на странице биллинга есть, но таблица rate-limits подписана как базовые лимиты Developer и расходится с лимитами Developer на странице моделей, поэтому бесплатную квоту здесь не утверждаем."
+    context: "131 072"
+    context_tokens: 131072
+    best_for: "быстрый дешёвый открытый чат"
+    summary: "Открытая модель OpenAI на Groq. В каталоге только подтверждённая платная цена."
+    source: "https://console.groq.com/docs/models"
+    last_verified: "2026-11-09"
+    availability: "available"
+    runnable: true
+  groq_gpt_oss_120b:
+    litellm: "groq/openai/gpt-oss-120b"
+    name: "GPT-OSS 120B (Groq)"
+    provider: "Groq"
+    billing: "paid"
+    free_tier: false
+    price_status: "known"
+    price_input_per_1m: 0.15
+    price_output_per_1m: 0.6
+    price_note: "On-demand: $0.15 / $0.60 за 1M, окно 131 072. Бесплатную квоту не утверждаем: см. оговорку у GPT-OSS 20B."
+    context: "131 072"
+    context_tokens: 131072
+    best_for: "более сильный открытый чат на Groq"
+    summary: "120B вариант GPT-OSS в проде Groq. Цена — Developer on-demand, не обещание free tier."
+    source: "https://console.groq.com/docs/models"
+    last_verified: "2026-11-09"
+    availability: "available"
+    runnable: true
+  groq_qwen38_27b:
+    litellm: "groq/qwen/qwen3.8-27b"
+    name: "Qwen 3.8 27B (Groq)"
+    provider: "Groq"
+    billing: "paid"
+    free_tier: false
+    price_status: "known"
+    price_input_per_1m: 0.8
+    price_output_per_1m: 4
+    price_note: "Preview-модель. On-demand: $0.80 / $4 за 1M, окно 131 072, выход до 16 384. Бесплатную квоту не утверждаем."
+    context: "131 072"
+    context_tokens: 131072
+    best_for: "мультиязычные и визуальные черновики"
+    summary: "Qwen3.8-27B в превью Groq. Не используйте как единственную прод-модель: превью снимают с коротким уведомлением."
+    source: "https://console.groq.com/docs/models"
+    last_verified: "2026-11-09"
+    availability: "preview"
+    runnable: true
+  mistral_small_4:
+    litellm: "mistral/mistral-small-2603"
+    name: "Mistral Small 4"
+    provider: "Mistral"
+    billing: "paid"
+    free_tier: false
+    price_status: "known"
+    price_input_per_1m: 0.15
+    price_output_per_1m: 0.6
+    price_note: "Платный API. $0.15 / $0.60 за 1M, кэш входа $0.015. Окно 256k. ID: mistral-small-2603."
+    context: "256K"
+    context_tokens: 256000
+    best_for: "недорогой мультимодальный чат Mistral"
+    summary: "Открытая Small 4 (Apache 2.0) в API Mistral. Это не бесплатный тир."
+    source: "https://docs.mistral.ai/inference/pricing"
+    last_verified: "2026-11-09"
+    availability: "available"
+    runnable: true
+  mistral_large_4:
+    litellm: "mistral/mistral-large-4"
+    name: "Mistral Large 4"
+    provider: "Mistral"
+    billing: "paid"
+    free_tier: false
+    price_status: "known"
+    price_input_per_1m: 0.7
+    price_output_per_1m: 2.1
+    price_note: "Платный API. $0.70 / $2.10 за 1M, кэш входа $0.07. Окно 1M."
+    context: "1M"
+    context_tokens: 1000000
+    best_for: "сильные мультимодальные задачи Mistral"
+    summary: "Флагман Mistral Large 4, открытые веса, платный API."
+    source: "https://docs.mistral.ai/inference/pricing"
+    last_verified: "2026-11-09"
+    availability: "available"
+    runnable: true
+  codestral:
+    litellm: "mistral/codestral-2508"
+    name: "Codestral"
+    provider: "Mistral"
+    billing: "paid"
+    free_tier: false
+    price_status: "known"
+    price_input_per_1m: 0.3
+    price_output_per_1m: 0.9
+    price_note: "Платный API. $0.30 / $0.90 за 1M. Окно 128k. ID: codestral-2508."
+    context: "128K"
+    context_tokens: 128000
+    best_for: "генерация и правка кода"
+    summary: "Кодовая модель Mistral. Для чата агента подходит, это не отдельный embeddings-эндпоинт."
+    source: "https://docs.mistral.ai/inference/pricing"
+    last_verified: "2026-11-09"
+    availability: "available"
+    runnable: true
+  mistral_moderation:
+    litellm: "mistral/mistral-moderation-2603"
+    name: "Mistral Moderation 2"
+    provider: "Mistral"
+    billing: "free"
+    free_tier: true
+    price_status: "known"
+    price_input_per_1m: 0
+    price_output_per_1m: 0
+    price_note: "Официально Free, $0 за токены. Это модерация (на выходе оценки), не чат-модель для агента, поэтому в списке ролей её нет."
+    context: "128K"
+    context_tokens: 128000
+    best_for: "проверка текста, не генерация"
+    summary: "Бесплатный классификатор Mistral. В пайплайн разработчика не подставляется."
+    source: "https://docs.mistral.ai/inference/pricing"
+    last_verified: "2026-11-09"
+    availability: "available"
+    runnable: false
+  cerebras_gpt_oss_120b:
+    litellm: "cerebras/gpt-oss-120b"
+    name: "GPT-OSS 120B (Cerebras)"
+    provider: "Cerebras"
+    billing: "paid"
+    free_tier: false
+    price_status: "unknown"
+    price_input_per_1m: null
+    price_output_per_1m: null
+    price_note: "unknown. ID и окно (free trial 65k / paid 131k) есть в каталоге Cerebras. Постоянного free tier нет: разовый кредит $5 на 30 дней после привязки карты. Сумму $/1M на официальной странице модели в этой сверке подтвердить не удалось, поэтому цифру не ставим."
+    context: "131K paid / 65K trial"
+    context_tokens: null
+    best_for: "быстрый открытый чат, если есть ключ Cerebras"
+    summary: "Одна из двух моделей Shared Inference. Цена токена — unknown, пока не сверите cerebras.ai/pricing сами."
+    source: "https://inference-docs.cerebras.ai/models/overview"
+    last_verified: "2026-11-09"
+    availability: "available"
+    runnable: true
+  cerebras_qwen38_27b:
+    litellm: "cerebras/qwen-3.8-27b"
+    name: "Qwen 3.8 27B (Cerebras)"
+    provider: "Cerebras"
+    billing: "paid"
+    free_tier: false
+    price_status: "unknown"
+    price_input_per_1m: null
+    price_output_per_1m: null
+    price_note: "unknown. ID подтверждён, окно free trial 64k / paid 128k. Постоянного free tier нет. Сумму $/1M в этой сверке не подтверждаем."
+    context: "128K paid / 64K trial"
+    context_tokens: null
+    best_for: "вторая модель Cerebras Shared Inference"
+    summary: "Qwen 3.8 27B на Cerebras. Цена токена — unknown."
+    source: "https://inference-docs.cerebras.ai/models/overview"
+    last_verified: "2026-11-09"
+    availability: "available"
+    runnable: true
+  or_nemotron_ultra:
+    litellm: "openrouter/nvidia/nemotron-3-ultra-550b-a55b:free"
+    name: "Nemotron 3 Ultra (free)"
+    provider: "OpenRouter"
+    billing: "free"
+    free_tier: true
+    price_status: "known"
+    price_input_per_1m: 0
+    price_output_per_1m: 0
+    price_note: "Free: $0 за входные и выходные токены в ответе GET https://openrouter.ai/api/v1/models на 2026-11-09. Есть лимиты запросов. Запасной платный маршрут в том же запросе тарифицируется отдельно. Условия обучения на промптах зависят от провайдера."
+    context: "1 000 000"
+    context_tokens: 1000000
+    best_for: "большая текстовая модель NVIDIA без платы за токены"
+    summary: "Нулевой прайс OpenRouter для nvidia/nemotron-3-ultra-550b-a55b:free. Это не кредиты провайдера, а вариант :free или роутер openrouter/free."
+    source: "https://openrouter.ai/api/v1/models"
+    last_verified: "2026-11-09"
+    availability: "available"
+    runnable: true
+  or_nemotron_lightning:
+    litellm: "openrouter/nvidia/nemotron-3.5-lightning:free"
+    name: "Nemotron 3.5 Lightning (free)"
+    provider: "OpenRouter"
+    billing: "free"
+    free_tier: true
+    price_status: "known"
+    price_input_per_1m: 0
+    price_output_per_1m: 0
+    price_note: "Free: $0 за входные и выходные токены в ответе GET https://openrouter.ai/api/v1/models на 2026-11-09. Есть лимиты запросов. Запасной платный маршрут в том же запросе тарифицируется отдельно. Условия обучения на промптах зависят от провайдера."
+    context: "1 000 000"
+    context_tokens: 1000000
+    best_for: "быстрая текстовая модель NVIDIA"
+    summary: "Нулевой прайс OpenRouter для nvidia/nemotron-3.5-lightning:free. Это не кредиты провайдера, а вариант :free или роутер openrouter/free."
+    source: "https://openrouter.ai/api/v1/models"
+    last_verified: "2026-11-09"
+    availability: "available"
+    runnable: true
+  or_nemotron_super_vl:
+    litellm: "openrouter/nvidia/nemotron-3.5-super-vl:free"
+    name: "Nemotron 3.5 Super VL (free)"
+    provider: "OpenRouter"
+    billing: "free"
+    free_tier: true
+    price_status: "known"
+    price_input_per_1m: 0
+    price_output_per_1m: 0
+    price_note: "Free: $0 за входные и выходные токены в ответе GET https://openrouter.ai/api/v1/models на 2026-11-09. Есть лимиты запросов. Запасной платный маршрут в том же запросе тарифицируется отдельно. Условия обучения на промптах зависят от провайдера."
+    context: "1 000 000"
+    context_tokens: 1000000
+    best_for: "мультимодальная (текст, изображение, видео) модель NVIDIA"
+    summary: "Нулевой прайс OpenRouter для nvidia/nemotron-3.5-super-vl:free. Это не кредиты провайдера, а вариант :free или роутер openrouter/free."
+    source: "https://openrouter.ai/api/v1/models"
+    last_verified: "2026-11-09"
+    availability: "available"
+    runnable: true
+  or_nemotron_nano:
+    litellm: "openrouter/nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free"
+    name: "Nemotron 3 Nano Omni (free)"
+    provider: "OpenRouter"
+    billing: "free"
+    free_tier: true
+    price_status: "known"
+    price_input_per_1m: 0
+    price_output_per_1m: 0
+    price_note: "Free: $0 за входные и выходные токены в ответе GET https://openrouter.ai/api/v1/models на 2026-11-09. Есть лимиты запросов. Запасной платный маршрут в том же запросе тарифицируется отдельно. Условия обучения на промптах зависят от провайдера."
+    context: "256 000"
+    context_tokens: 256000
+    best_for: "небольшая мультимодальная reasoning-модель"
+    summary: "Нулевой прайс OpenRouter для nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free. Это не кредиты провайдера, а вариант :free или роутер openrouter/free."
+    source: "https://openrouter.ai/api/v1/models"
+    last_verified: "2026-11-09"
+    availability: "available"
+    runnable: true
+  or_gemma_4_31b:
+    litellm: "openrouter/google/gemma-4-31b-it:free"
+    name: "Gemma 4 31B (free)"
+    provider: "OpenRouter"
+    billing: "free"
+    free_tier: true
+    price_status: "known"
+    price_input_per_1m: 0
+    price_output_per_1m: 0
+    price_note: "Free: $0 за входные и выходные токены в ответе GET https://openrouter.ai/api/v1/models на 2026-11-09. Есть лимиты запросов. Запасной платный маршрут в том же запросе тарифицируется отдельно. Условия обучения на промптах зависят от провайдера."
+    context: "262 144"
+    context_tokens: 262144
+    best_for: "открытая Gemma 4 31B, принимает изображения"
+    summary: "Нулевой прайс OpenRouter для google/gemma-4-31b-it:free. Это не кредиты провайдера, а вариант :free или роутер openrouter/free."
+    source: "https://openrouter.ai/api/v1/models"
+    last_verified: "2026-11-09"
+    availability: "available"
+    runnable: true
+  or_gemma_4_26b:
+    litellm: "openrouter/google/gemma-4-26b-a4b-it:free"
+    name: "Gemma 4 26B A4B (free)"
+    provider: "OpenRouter"
+    billing: "free"
+    free_tier: true
+    price_status: "known"
+    price_input_per_1m: 0
+    price_output_per_1m: 0
+    price_note: "Free: $0 за входные и выходные токены в ответе GET https://openrouter.ai/api/v1/models на 2026-11-09. Есть лимиты запросов. Запасной платный маршрут в том же запросе тарифицируется отдельно. Условия обучения на промптах зависят от провайдера."
+    context: "262 144"
+    context_tokens: 262144
+    best_for: "облегчённая MoE Gemma 4"
+    summary: "Нулевой прайс OpenRouter для google/gemma-4-26b-a4b-it:free. Это не кредиты провайдера, а вариант :free или роутер openrouter/free."
+    source: "https://openrouter.ai/api/v1/models"
+    last_verified: "2026-11-09"
+    availability: "available"
+    runnable: true
+  or_north_mini_code:
+    litellm: "openrouter/cohere/north-mini-code:free"
+    name: "North Mini Code (free)"
+    provider: "OpenRouter"
+    billing: "free"
+    free_tier: true
+    price_status: "known"
+    price_input_per_1m: 0
+    price_output_per_1m: 0
+    price_note: "Free: $0 за входные и выходные токены в ответе GET https://openrouter.ai/api/v1/models на 2026-11-09. Есть лимиты запросов. Запасной платный маршрут в том же запросе тарифицируется отдельно. Условия обучения на промптах зависят от провайдера."
+    context: "256 000"
+    context_tokens: 256000
+    best_for: "бесплатная кодовая модель Cohere на OpenRouter"
+    summary: "Нулевой прайс OpenRouter для cohere/north-mini-code:free. Это не кредиты провайдера, а вариант :free или роутер openrouter/free."
+    source: "https://openrouter.ai/api/v1/models"
+    last_verified: "2026-11-09"
+    availability: "available"
+    runnable: true
+  or_flint:
+    litellm: "openrouter/recursive/flint-v1.0:free"
+    name: "Flint v1 (free)"
+    provider: "OpenRouter"
+    billing: "free"
+    free_tier: true
+    price_status: "known"
+    price_input_per_1m: 0
+    price_output_per_1m: 0
+    price_note: "Free: $0 за входные и выходные токены в ответе GET https://openrouter.ai/api/v1/models на 2026-11-09. Есть лимиты запросов. Запасной платный маршрут в том же запросе тарифицируется отдельно. Условия обучения на промптах зависят от провайдера."
+    context: "262 144"
+    context_tokens: 262144
+    best_for: "небольшая текстовая модель Recursive"
+    summary: "Нулевой прайс OpenRouter для recursive/flint-v1.0:free. Это не кредиты провайдера, а вариант :free или роутер openrouter/free."
+    source: "https://openrouter.ai/api/v1/models"
+    last_verified: "2026-11-09"
+    availability: "available"
+    runnable: true
+  or_xing4:
+    litellm: "openrouter/xingchen-agi/xing4.0-29b-a4b:free"
+    name: "Xing4.0 29B (free)"
+    provider: "OpenRouter"
+    billing: "free"
+    free_tier: true
+    price_status: "known"
+    price_input_per_1m: 0
+    price_output_per_1m: 0
+    price_note: "Free: $0 за входные и выходные токены в ответе GET https://openrouter.ai/api/v1/models на 2026-11-09. Есть лимиты запросов. Запасной платный маршрут в том же запросе тарифицируется отдельно. Условия обучения на промптах зависят от провайдера."
+    context: "262 144"
+    context_tokens: 262144
+    best_for: "текстовая MoE-модель XingChen"
+    summary: "Нулевой прайс OpenRouter для xingchen-agi/xing4.0-29b-a4b:free. Это не кредиты провайдера, а вариант :free или роутер openrouter/free."
+    source: "https://openrouter.ai/api/v1/models"
+    last_verified: "2026-11-09"
+    availability: "available"
+    runnable: true
+  or_dots_note:
+    litellm: "openrouter/dots-studio/dots-3-note-preview:free"
+    name: "Dots3-Note Preview (free)"
+    provider: "OpenRouter"
+    billing: "free"
+    free_tier: true
+    price_status: "known"
+    price_input_per_1m: 0
+    price_output_per_1m: 0
+    price_note: "Free: $0 за входные и выходные токены в ответе GET https://openrouter.ai/api/v1/models на 2026-11-09. Есть лимиты запросов. Запасной платный маршрут в том же запросе тарифицируется отдельно. Условия обучения на промптах зависят от провайдера."
+    context: "512 000"
+    context_tokens: 512000
+    best_for: "preview с длинным контекстом, текст и изображения"
+    summary: "Нулевой прайс OpenRouter для dots-studio/dots-3-note-preview:free. Это не кредиты провайдера, а вариант :free или роутер openrouter/free."
+    source: "https://openrouter.ai/api/v1/models"
+    last_verified: "2026-11-09"
+    availability: "preview"
+    runnable: true
+  or_lfm3:
+    litellm: "openrouter/liquid/lfm-3-1.7b:free"
+    name: "LFM3 1.7B (free)"
+    provider: "OpenRouter"
+    billing: "free"
+    free_tier: true
+    price_status: "known"
+    price_input_per_1m: 0
+    price_output_per_1m: 0
+    price_note: "Free: $0 за входные и выходные токены в ответе GET https://openrouter.ai/api/v1/models на 2026-11-09. Есть лимиты запросов. Запасной платный маршрут в том же запросе тарифицируется отдельно. Условия обучения на промптах зависят от провайдера."
+    context: "262 144"
+    context_tokens: 262144
+    best_for: "очень маленькая текстовая модель"
+    summary: "Нулевой прайс OpenRouter для liquid/lfm-3-1.7b:free. Это не кредиты провайдера, а вариант :free или роутер openrouter/free."
+    source: "https://openrouter.ai/api/v1/models"
+    last_verified: "2026-11-09"
+    availability: "available"
+    runnable: true
+  or_lfm25:
+    litellm: "openrouter/liquid/lfm-2.5-2.6b:free"
+    name: "LFM 2.5 2.6B (free)"
+    provider: "OpenRouter"
+    billing: "free"
+    free_tier: true
+    price_status: "known"
+    price_input_per_1m: 0
+    price_output_per_1m: 0
+    price_note: "Free: $0 за входные и выходные токены в ответе GET https://openrouter.ai/api/v1/models на 2026-11-09. Есть лимиты запросов. Запасной платный маршрут в том же запросе тарифицируется отдельно. Условия обучения на промптах зависят от провайдера."
+    context: "65 536"
+    context_tokens: 65536
+    best_for: "компактная модель Liquid"
+    summary: "Нулевой прайс OpenRouter для liquid/lfm-2.5-2.6b:free. Это не кредиты провайдера, а вариант :free или роутер openrouter/free."
+    source: "https://openrouter.ai/api/v1/models"
+    last_verified: "2026-11-09"
+    availability: "available"
+    runnable: true
+  or_free_router:
+    litellm: "openrouter/openrouter/free"
+    name: "OpenRouter Free Router"
+    provider: "OpenRouter"
+    billing: "free"
+    free_tier: true
+    price_status: "known"
+    price_input_per_1m: 0
+    price_output_per_1m: 0
+    price_note: "Free: $0 за входные и выходные токены в ответе GET https://openrouter.ai/api/v1/models на 2026-11-09. Есть лимиты запросов. Запасной платный маршрут в том же запросе тарифицируется отдельно. Условия обучения на промптах зависят от провайдера."
+    context: "200 000"
+    context_tokens: 200000
+    best_for: "роутер, который выбирает только среди бесплатных моделей"
+    summary: "Нулевой прайс OpenRouter для openrouter/free. Это не кредиты провайдера, а вариант :free или роутер openrouter/free."
+    source: "https://openrouter.ai/api/v1/models"
+    last_verified: "2026-11-09"
+    availability: "available"
+    runnable: true
+  or_crouton:
+    litellm: "openrouter/stealth/crouton-alpha"
+    name: "Crouton Alpha"
+    provider: "OpenRouter"
+    billing: "free"
+    free_tier: true
+    price_status: "known"
+    price_input_per_1m: 0
+    price_output_per_1m: 0
+    price_note: "Сейчас $0 за текст в API моделей (2026-11-09), но это preview без суффикса :free. Цена может стать ненулевой без отдельного релиза каталога. Не считайте её постоянным free tier."
+    context: "1 048 576"
+    context_tokens: 1048576
+    best_for: "проба длинного мультимодального preview"
+    summary: "Временный нулевой прайс. Для стабильной бесплатной работы лучше :free модели или роутер openrouter/free."
+    source: "https://openrouter.ai/api/v1/models"
+    last_verified: "2026-11-09"
+    availability: "preview"
+    runnable: true
+  ollama_gemma4:
+    litellm: "ollama_chat/gemma4"
+    name: "Gemma 4 (Ollama)"
+    provider: "Ollama"
+    billing: "local"
+    free_tier: true
+    price_status: "known"
+    price_input_per_1m: 0
+    price_output_per_1m: 0
+    price_note: "Local: $0 за токены API. Платите только своим электричеством и диском. Нужен запущенный Ollama (по умолчанию http://localhost:11434) и скачанные веса `ollama pull`. Окно контекста на карточке библиотеки в этой сверке не фиксировали — оно зависит от тега и Modelfile."
+    context: "unknown"
+    context_tokens: null
+    best_for: "открытая Gemma локально"
+    summary: "Открытые веса из библиотеки Ollama, тег gemma4. Ключ API не нужен."
+    source: "https://ollama.com/library/gemma4"
+    last_verified: "2026-11-09"
+    availability: "available"
+    runnable: true
+    api_base: "http://localhost:11434"
+  ollama_llama32:
+    litellm: "ollama_chat/llama3.2"
+    name: "Llama 3.2 (Ollama)"
+    provider: "Ollama"
+    billing: "local"
+    free_tier: true
+    price_status: "known"
+    price_input_per_1m: 0
+    price_output_per_1m: 0
+    price_note: "Local: $0 за токены API. Платите только своим электричеством и диском. Нужен запущенный Ollama (по умолчанию http://localhost:11434) и скачанные веса `ollama pull`. Окно контекста на карточке библиотеки в этой сверке не фиксировали — оно зависит от тега и Modelfile."
+    context: "unknown"
+    context_tokens: null
+    best_for: "небольшая Llama для локальных шагов"
+    summary: "Открытые веса из библиотеки Ollama, тег llama3.2. Ключ API не нужен."
+    source: "https://ollama.com/library/llama3.2"
+    last_verified: "2026-11-09"
+    availability: "available"
+    runnable: true
+    api_base: "http://localhost:11434"
+  ollama_qwen3:
+    litellm: "ollama_chat/qwen3"
+    name: "Qwen 3 (Ollama)"
+    provider: "Ollama"
+    billing: "local"
+    free_tier: true
+    price_status: "known"
+    price_input_per_1m: 0
+    price_output_per_1m: 0
+    price_note: "Local: $0 за токены API. Платите только своим электричеством и диском. Нужен запущенный Ollama (по умолчанию http://localhost:11434) и скачанные веса `ollama pull`. Окно контекста на карточке библиотеки в этой сверке не фиксировали — оно зависит от тега и Modelfile."
+    context: "unknown"
+    context_tokens: null
+    best_for: "локальный Qwen 3"
+    summary: "Открытые веса из библиотеки Ollama, тег qwen3. Ключ API не нужен."
+    source: "https://ollama.com/library/qwen3"
+    last_verified: "2026-11-09"
+    availability: "available"
+    runnable: true
+    api_base: "http://localhost:11434"
+  ollama_qwen35:
+    litellm: "ollama_chat/qwen3.5"
+    name: "Qwen 3.5 (Ollama)"
+    provider: "Ollama"
+    billing: "local"
+    free_tier: true
+    price_status: "known"
+    price_input_per_1m: 0
+    price_output_per_1m: 0
+    price_note: "Local: $0 за токены API. Платите только своим электричеством и диском. Нужен запущенный Ollama (по умолчанию http://localhost:11434) и скачанные веса `ollama pull`. Окно контекста на карточке библиотеки в этой сверке не фиксировали — оно зависит от тега и Modelfile."
+    context: "unknown"
+    context_tokens: null
+    best_for: "более новый локальный Qwen"
+    summary: "Открытые веса из библиотеки Ollama, тег qwen3.5. Ключ API не нужен."
+    source: "https://ollama.com/library/qwen3.5"
+    last_verified: "2026-11-09"
+    availability: "available"
+    runnable: true
+    api_base: "http://localhost:11434"
+  ollama_qwen25_coder:
+    litellm: "ollama_chat/qwen2.5-coder"
+    name: "Qwen 2.5 Coder (Ollama)"
+    provider: "Ollama"
+    billing: "local"
+    free_tier: true
+    price_status: "known"
+    price_input_per_1m: 0
+    price_output_per_1m: 0
+    price_note: "Local: $0 за токены API. Платите только своим электричеством и диском. Нужен запущенный Ollama (по умолчанию http://localhost:11434) и скачанные веса `ollama pull`. Окно контекста на карточке библиотеки в этой сверке не фиксировали — оно зависит от тега и Modelfile."
+    context: "unknown"
+    context_tokens: null
+    best_for: "локальный кодовый Qwen"
+    summary: "Открытые веса из библиотеки Ollama, тег qwen2.5-coder. Ключ API не нужен."
+    source: "https://ollama.com/library/qwen2.5-coder"
+    last_verified: "2026-11-09"
+    availability: "available"
+    runnable: true
+    api_base: "http://localhost:11434"
+  ollama_deepseek_r1:
+    litellm: "ollama_chat/deepseek-r1"
+    name: "DeepSeek R1 (Ollama)"
+    provider: "Ollama"
+    billing: "local"
+    free_tier: true
+    price_status: "known"
+    price_input_per_1m: 0
+    price_output_per_1m: 0
+    price_note: "Local: $0 за токены API. Платите только своим электричеством и диском. Нужен запущенный Ollama (по умолчанию http://localhost:11434) и скачанные веса `ollama pull`. Окно контекста на карточке библиотеки в этой сверке не фиксировали — оно зависит от тега и Modelfile."
+    context: "unknown"
+    context_tokens: null
+    best_for: "локальные рассуждения"
+    summary: "Открытые веса из библиотеки Ollama, тег deepseek-r1. Ключ API не нужен."
+    source: "https://ollama.com/library/deepseek-r1"
+    last_verified: "2026-11-09"
+    availability: "available"
+    runnable: true
+    api_base: "http://localhost:11434"
+  ollama_phi4:
+    litellm: "ollama_chat/phi4"
+    name: "Phi-4 (Ollama)"
+    provider: "Ollama"
+    billing: "local"
+    free_tier: true
+    price_status: "known"
+    price_input_per_1m: 0
+    price_output_per_1m: 0
+    price_note: "Local: $0 за токены API. Платите только своим электричеством и диском. Нужен запущенный Ollama (по умолчанию http://localhost:11434) и скачанные веса `ollama pull`. Окно контекста на карточке библиотеки в этой сверке не фиксировали — оно зависит от тега и Modelfile."
+    context: "unknown"
+    context_tokens: null
+    best_for: "небольшая модель Microsoft"
+    summary: "Открытые веса из библиотеки Ollama, тег phi4. Ключ API не нужен."
+    source: "https://ollama.com/library/phi4"
+    last_verified: "2026-11-09"
+    availability: "available"
+    runnable: true
+    api_base: "http://localhost:11434"
+  ollama_mistral:
+    litellm: "ollama_chat/mistral"
+    name: "Mistral (Ollama)"
+    provider: "Ollama"
+    billing: "local"
+    free_tier: true
+    price_status: "known"
+    price_input_per_1m: 0
+    price_output_per_1m: 0
+    price_note: "Local: $0 за токены API. Платите только своим электричеством и диском. Нужен запущенный Ollama (по умолчанию http://localhost:11434) и скачанные веса `ollama pull`. Окно контекста на карточке библиотеки в этой сверке не фиксировали — оно зависит от тега и Modelfile."
+    context: "unknown"
+    context_tokens: null
+    best_for: "классическая локальная Mistral 7B"
+    summary: "Открытые веса из библиотеки Ollama, тег mistral. Ключ API не нужен."
+    source: "https://ollama.com/library/mistral"
+    last_verified: "2026-11-09"
+    availability: "available"
+    runnable: true
+    api_base: "http://localhost:11434"

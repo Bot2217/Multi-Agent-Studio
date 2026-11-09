@@ -5,11 +5,13 @@ Multi-agent orchestrator: loads config/agents.yaml and runs pipeline.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Callable, Optional
+from typing import Callable, Optional
 
 import yaml
 
 from core.agent_runtime import AgentRuntime
+from core.catalog import KEY_ENV, api_base_for, load_models_catalog, provider_of
+from core.catalog import resolve_model as resolve_catalog_model
 
 ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_CONFIG = ROOT / "config" / "agents.yaml"
@@ -23,36 +25,10 @@ def load_config(path: Optional[str | Path] = None) -> dict:
         return yaml.safe_load(f) or {}
 
 
-def resolve_model(cfg: dict, model_key: str) -> str:
-    models = cfg.get("models") or {}
-    if model_key in models:
-        return models[model_key]
-    if "/" in str(model_key):
-        return str(model_key)
-    return str(model_key)
-
-
-def provider_of(model_id: str) -> str:
-    if model_id.startswith("anthropic"):
-        return "anthropic"
-    if model_id.startswith("openai"):
-        return "openai"
-    if model_id.startswith("gemini"):
-        return "gemini"
-    if model_id.startswith("xai"):
-        return "xai"
-    if model_id.startswith("deepseek"):
-        return "deepseek"
-    return "openai"
-
-
-KEY_ENV = {
-    "anthropic": "ANTHROPIC_API_KEY",
-    "openai": "OPENAI_API_KEY",
-    "gemini": "GOOGLE_API_KEY",
-    "xai": "XAI_API_KEY",
-    "deepseek": "DEEPSEEK_API_KEY",
-}
+def resolve_model(cfg: dict, model_key: str, catalog: Optional[dict] = None) -> str:
+    if catalog is None:
+        catalog = load_models_catalog()
+    return resolve_catalog_model(model_key, cfg, catalog)
 
 
 class Orchestrator:
@@ -81,6 +57,7 @@ class Orchestrator:
         self.overrides = overrides or {}
         self.pipeline_name = pipeline_name
         self.power = None
+        self.catalog = load_models_catalog()
 
     def _agent_cfg(self, agent_id: str) -> dict:
         base = dict((self.cfg.get("agents") or {}).get(agent_id) or {})
@@ -95,7 +72,11 @@ class Orchestrator:
 
     def _api_key_for_model(self, model_id: str) -> Optional[str]:
         prov = provider_of(model_id)
-        env_key = KEY_ENV.get(prov, "OPENAI_API_KEY")
+        if prov == "ollama":
+            return self.api_keys.get("OLLAMA_API_KEY") or "ollama"
+        env_key = KEY_ENV.get(prov)
+        if not env_key:
+            return None
         return self.api_keys.get(env_key) or None
 
     def list_pipeline_steps(self) -> list[str]:
@@ -111,8 +92,7 @@ class Orchestrator:
 
     def recommendations(self, agent_id: str) -> list[str]:
         rec = (self.cfg.get("recommendations") or {}).get(agent_id) or []
-        models = self.cfg.get("models") or {}
-        return [models.get(r, r) for r in rec]
+        return [resolve_model(self.cfg, r, self.catalog) for r in rec]
 
     def run(self, task: str) -> str:
         steps = self.list_pipeline_steps()
@@ -125,8 +105,9 @@ class Orchestrator:
         for aid in steps:
             ac = self._agent_cfg(aid)
             name = ac.get("name", aid)
-            model_key = ac.get("model", "claude_sonnet")
-            model_id = resolve_model(self.cfg, model_key)
+            model_key = ac.get("model", "claude_sonnet_55")
+            model_id = resolve_model(self.cfg, model_key, self.catalog)
+            meta = self.catalog.get(model_key) or {}
             temp = float(ac.get("temperature", 0.2))
             tools = ac.get("tools")
             if tools is not None and len(tools) == 0:
@@ -142,6 +123,7 @@ class Orchestrator:
                 msg = f"[SKIP {name}] нет API-ключа для модели {model_id}"
                 self.log(msg)
                 context_parts.append(msg)
+                reports.append(f"## {name}\n\n{msg}")
                 continue
 
             self.log(f"\n>>> {name} ({aid}) | model={model_id} | tools={allowed}")
@@ -150,6 +132,7 @@ class Orchestrator:
                 backup_dir=self.backup_dir,
                 model=model_id,
                 api_key=api_key,
+                base_url=api_base_for(model_id, meta),
                 temperature=temp,
                 max_steps=self.max_steps,
                 shell_timeout=self.shell_timeout,

@@ -43,6 +43,7 @@ class RemoteManager:
             return f"Unknown device: {name}"
         # Cross-platform-ish ping
         import platform
+
         count_flag = "-n" if platform.system() == "Windows" else "-c"
         try:
             r = subprocess.run(
@@ -64,9 +65,12 @@ class RemoteManager:
         if shutil.which("ssh"):
             ssh_cmd = [
                 "ssh",
-                "-o", "StrictHostKeyChecking=accept-new",
-                "-o", "ConnectTimeout=10",
-                "-p", str(d.port),
+                "-o",
+                "StrictHostKeyChecking=accept-new",
+                "-o",
+                "ConnectTimeout=10",
+                "-p",
+                str(d.port),
             ]
             if d.key_path:
                 ssh_cmd.extend(["-i", d.key_path])
@@ -89,6 +93,7 @@ class RemoteManager:
         # Fallback: paramiko if installed
         try:
             import paramiko
+
             client = paramiko.SSHClient()
             client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
             kwargs = {

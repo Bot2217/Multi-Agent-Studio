@@ -1,7 +1,7 @@
 from .filesystem import WorkspaceFS
-from .shell import ShellRunner
-from .remote import RemoteManager, RemoteDevice
 from .power import PowerManager
+from .remote import RemoteDevice, RemoteManager
+from .shell import ShellRunner
 
 __all__ = [
     "WorkspaceFS",
