@@ -27,6 +27,7 @@ from core.catalog import (
     runnable_models,
     sorted_model_keys,
 )
+from core.icons import icon
 from core.orchestrator import Orchestrator, load_config
 from core.themes import (
     SCREENS,
@@ -83,13 +84,13 @@ def slip(title: str, text: str) -> None:
     )
 
 
-def step(number: str, title: str, hint: str = "") -> None:
+def step(number: str, title: str, hint: str = "", icon_name: str = "check") -> None:
     hint_html = f'<p class="step-hint">{html.escape(hint)}</p>' if hint else ""
     st.markdown(
         (
             '<div class="step">'
             f'<span class="step-no">{html.escape(number)}</span>'
-            f"<div><h2>{html.escape(title)}</h2>{hint_html}</div></div>"
+            f"<div><h2>{icon(icon_name)}{html.escape(title)}</h2>{hint_html}</div></div>"
         ),
         unsafe_allow_html=True,
     )
@@ -190,22 +191,27 @@ def render_theme_switch() -> None:
 
 def render_nav() -> None:
     current = resolve_screen(st.session_state.get("screen"))
-    st.markdown('<p class="kicker">Разделы</p>', unsafe_allow_html=True)
-    for screen_id, label in SCREENS:
-        if st.button(
-            label,
-            key=f"nav_{screen_id}",
-            type="primary" if screen_id == current else "secondary",
-            use_container_width=True,
-        ):
-            st.session_state.screen = screen_id
-            persist()
-            st.rerun()
+    columns = st.columns(len(SCREENS))
+    for column, (screen_id, label) in zip(columns, SCREENS):
+        with column:
+            if st.button(
+                label,
+                key=f"nav_{screen_id}",
+                type="primary" if screen_id == current else "secondary",
+                use_container_width=True,
+            ):
+                st.session_state.screen = screen_id
+                persist()
+                st.rerun()
 
 
 def render_sidebar() -> None:
     with st.sidebar:
-        render_nav()
+        st.markdown(
+            f'<div class="mast"><div class="mark">{icon("play", 22)}</div>'
+            '<div><p class="kicker">Студия</p><strong>Агенты</strong></div></div>',
+            unsafe_allow_html=True,
+        )
         render_theme_switch()
         st.header("Ключи")
         filled = [
@@ -290,11 +296,12 @@ def render_header(catalog: dict, active_steps: list[str]) -> None:
             '<div class="mast"><div class="mark" aria-hidden="true">МС</div><div>'
             f'<p class="kicker">{theme["kicker"]}</p>'
             "<h1>Multi-Agent Studio</h1>"
-            '<p class="studio-lead">Сначала папка, затем задача, затем «Запустить». '
-            "Разделы и тема — в колонке слева.</p></div></div>"
+            '<p class="studio-lead">Сначала ключ слева, затем папка и задача, затем «Запустить».</p>'
+            "</div></div>"
         ),
         unsafe_allow_html=True,
     )
+    render_nav()
     free_count = sum(1 for meta in catalog.values() if is_free_option(meta))
     known_keys = sum(
         1 for env in KEY_NAMES if str(st.session_state.api_keys.get(env) or "").strip()
@@ -344,7 +351,35 @@ def render_chain(cfg: dict, steps: list[str], catalog: dict) -> None:
 
 
 def render_run(cfg: dict, catalog: dict, pipelines: dict) -> None:
-    step("1", "Папка", "Агенты работают только внутри неё. Перед перезаписью делается backup.")
+    folder_ready = workspace_dir().is_dir()
+    task_ready = bool(str(st.session_state.get("task_text") or "").strip())
+    done = 1 + int(folder_ready) + int(task_ready)
+    st.markdown(
+        '<div class="progress" aria-hidden="true">'
+        + "".join(f'<span class="seg{" on" if index < done else ""}"></span>' for index in range(3))
+        + "</div>",
+        unsafe_allow_html=True,
+    )
+    left, right = st.columns([1.45, 1])
+    with left:
+        with st.container(key="card_folder"):
+            _render_folder_card()
+    with right:
+        with st.container(key="card_status"):
+            _render_status_card(cfg, catalog, pipelines, folder_ready)
+    with st.container(key="card_pipeline"):
+        pipeline_name, active = _render_pipeline_card(cfg, catalog, pipelines)
+    with st.container(key="card_task"):
+        _render_task_card(cfg, catalog, pipeline_name, active)
+
+
+def _render_folder_card() -> None:
+    step(
+        "1",
+        "Папка",
+        "Агенты работают только внутри неё. Перед перезаписью делается backup.",
+        "folder",
+    )
     presets = preset_paths(DEFAULT_WS)
     columns = st.columns(min(4, max(len(presets), 1)))
     for index, (label, path) in enumerate(presets):
@@ -355,20 +390,38 @@ def render_run(cfg: dict, catalog: dict, pipelines: dict) -> None:
                 st.rerun()
     st.text_input("Путь к папке", key="workspace_path")
     folder = workspace_dir()
-    action_col, _rest = st.columns([1, 3])
-    with action_col:
-        if st.button("Создать папку", use_container_width=True):
-            try:
-                folder.mkdir(parents=True, exist_ok=True)
-                st.success(f"Папка готова: {folder}")
-            except OSError as exc:
-                st.error(f"Не удалось создать папку: {exc}")
+    if st.button("Создать папку", use_container_width=True):
+        try:
+            folder.mkdir(parents=True, exist_ok=True)
+            st.success(f"Папка готова: {folder}")
+        except OSError as exc:
+            st.error(f"Не удалось создать папку: {exc}")
     if folder.is_dir():
         st.caption(f"Папка на месте: {folder}")
     else:
         st.warning("Такой папки нет. Создайте её или выберите другой путь.")
 
-    step("2", "Пайплайн", "Включённые роли идут слева направо.")
+
+def _render_status_card(cfg: dict, catalog: dict, pipelines: dict, folder_ready: bool) -> None:
+    step(" ", "Сейчас", "Что уже готово к запуску.", "check")
+    known = sum(1 for env in KEY_NAMES if str(st.session_state.api_keys.get(env) or "").strip())
+    pipe = st.session_state.get("pipeline_select") or ""
+    steps = list((pipelines.get(pipe) or {}).get("steps") or [])
+    active = active_agent_ids(cfg, steps)
+    st.markdown(
+        (
+            f"<p>{icon('folder')} Папка: {'есть' if folder_ready else 'нет'}</p>"
+            f"<p>{icon('key')} Ключей: {known} из {len(KEY_LABELS)}</p>"
+            f"<p>{icon('users')} Активных ролей: {len(active)}</p>"
+        ),
+        unsafe_allow_html=True,
+    )
+    if known == 0:
+        st.caption("Дальше: вставьте ключ в колонке слева. Для старта хватит Google.")
+
+
+def _render_pipeline_card(cfg: dict, catalog: dict, pipelines: dict):
+    step("2", "Пайплайн", "Включённые роли идут слева направо.", "users")
     pipe_names = list(pipelines.keys())
     if st.session_state.pipeline_select not in pipe_names:
         st.session_state.pipeline_select = pipe_names[0]
@@ -396,8 +449,11 @@ def render_run(cfg: dict, catalog: dict, pipelines: dict) -> None:
                 + ", ".join(dict.fromkeys(bits))
                 + ". Такой шаг будет пропущен. Локальный Ollama ключ не требует."
             )
+    return pipeline_name, active
 
-    step("3", "Задача", "Одно предложение достаточно. Итог останется ниже.")
+
+def _render_task_card(cfg: dict, catalog: dict, pipeline_name: str, active: list[str]) -> None:
+    step("3", "Задача", "Одно предложение достаточно. Итог останется ниже.", "play")
     task = st.text_area(
         "Задача",
         height=150,
@@ -528,6 +584,7 @@ def execute_run(cfg: dict, catalog: dict, pipeline_name: str, task: str, active:
 
 
 def render_agents(cfg: dict, catalog: dict, model_choices: list[str]) -> None:
+    st.markdown(f"<h2>{icon('users')}Агенты</h2>", unsafe_allow_html=True)
     st.caption(
         "Бейдж Free tier значит, что у провайдера есть бесплатная квота, а цифра рядом — платный тариф за её пределами. "
         "Настройки пишутся в user_settings.json."
@@ -638,6 +695,7 @@ def passes_billing(meta: dict, mode: str) -> bool:
 
 
 def render_models(catalog: dict) -> None:
+    st.markdown(f"<h2>{icon('grid')}Модели</h2>", unsafe_allow_html=True)
     st.markdown(
         "Цены сверены **9 ноября 2026** по страницам провайдеров и ответу API OpenRouter. "
         "Если цифры не было в источнике, стоит **unknown** — её не придумывали. "
@@ -737,6 +795,7 @@ def render_sheet(rows: list[dict]) -> None:
 
 
 def render_files() -> None:
+    st.markdown(f"<h2>{icon('folder')}Файлы</h2>", unsafe_allow_html=True)
     folder = workspace_dir()
     st.caption(f"Корень: {folder}")
     if not folder.is_dir():
@@ -779,6 +838,7 @@ def show_file(filesystem, path: str) -> None:
 
 
 def render_ssh() -> None:
+    st.markdown(f"<h2>{icon('terminal')}SSH</h2>", unsafe_allow_html=True)
     st.warning(
         "Команда выполнится на указанном компьютере по SSH. Добавляйте только свои машины в локальной сети. "
         "Пароль в форму не входит: используйте ключ."
@@ -816,10 +876,11 @@ def render_ssh() -> None:
 
 
 def render_help() -> None:
+    st.markdown(f"<h2>{icon('help')}Справка</h2>", unsafe_allow_html=True)
     st.markdown(
         """
 ### Оформление
-Слева четыре темы: Бумага, Ночь, Обжиг и Хвоя. Выбор пишется в `user_settings.json` и остаётся после перезапуска.
+Слева три темы: Ночь, Бумага и Жар. Ночь включена по умолчанию. Выбор пишется в `user_settings.json` и остаётся после перезапуска.
 
 ### Как начать
 1. Создайте ключ хотя бы одного бесплатного варианта: Google AI Studio для Gemini или OpenRouter для моделей с суффиксом `:free`.
