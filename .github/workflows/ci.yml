@@ -28,6 +28,9 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - name: Update path fast-forwards a real clone and survives failure
+        shell: cmd
+        run: tests\windows_update_probe.cmd
       - name: Launcher setup creates the venv and installs dependencies
         shell: cmd
         run: start.bat setup
