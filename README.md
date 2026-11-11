@@ -8,40 +8,19 @@
 
 ## Как выглядит
 
-Слева меню разделов и переключатель из четырёх тем. Выбор пишется в `user_settings.json`. Заголовки — Literata, текст — Golos Text, код и ID моделей — JetBrains Mono: у всех трёх есть кириллица. Предупреждения остаются тёмным текстом на бумажной плашке.
+Слева пять разделов и переключатель темы: «Авто» (как в системе), «Светлая», «Тёмная». Главный экран — одно поле задачи, режим, папка и кнопка «Запустить»; ход работы и результат появляются под ней. Модели ролей — в «Агентах», ключи и параметры — в «Настройках». Выбор темы и остальные настройки пишутся в `user_settings.json`.
 
-### Бумага, раздел «Запуск»
-
-Меню слева, шаги 1–3 и главная кнопка. Тема по умолчанию.
-
-![Запуск в теме «Бумага»](docs/screenshots/theme-paper.png)
-
-### Каталог
-
-Таблица моделей на тех же токенах: радиус, тень, мелкие заголовки колонок.
-
-![Каталог моделей](docs/screenshots/models.png)
-
-### Ночь, раздел «Запуск»
-
-Та же вёрстка на тёмной теме.
-
-![Запуск в теме «Ночь»](docs/screenshots/theme-night.png)
-
-### Ночь, раздел «Агенты»
-
-Карточки ролей, бейдж и тихая кнопка сброса.
-
-![Агенты в теме «Ночь»](docs/screenshots/agents.png)
+Скриншоты в `docs/screenshots/` сняты до переработки интерфейса и ждут замены.
 
 ## Возможности
 
 - Пайплайны `full`, `code_only`, `research_code` и `single`. Лишнюю роль можно выключить.
-- Четыре темы оформления: Бумага, Ночь, Обжиг, Хвоя. Активная тема запоминается.
+- Две темы, светлая и тёмная, и режим «Авто», который следует за системой.
+- Запуск идёт в фоне: видно текущую роль и журнал, работу можно остановить. Ошибка одной роли не стирает отчёты предыдущих.
 - У каждой роли свои модель и температура. Выбор сохраняется в `user_settings.json`.
 - Каталог с бейджами **Free**, **Free tier**, **Paid**, **Local** и **Unknown**, поиском и фильтром «только бесплатные».
 - У каждой модели цена за 1M токенов входа и выхода, ссылка на источник и дата `last_verified`. Если цену нельзя было подтвердить, в карточке написано **unknown**.
-- Файлы только внутри выбранной папки, backup перед перезаписью и удалением, shell с запретом опасных шаблонов, SSH на явно указанный хост.
+- Файловые инструменты работают только внутри выбранной папки, перед перезаписью и удалением делается backup. Shell стартует в этой папке, не видит ключей API и режет известные опасные команды. SSH — на явно указанный хост.
 - Удержание от idle-сна на время длинной задачи.
 
 ## Быстрый старт
@@ -57,7 +36,7 @@ streamlit run app.py               # http://localhost:8501
 ```
 
 Windows: двойной щелчок по `start.bat` (git pull, зависимости, Streamlit).  
-Linux и macOS: `./start.sh` делает то же самое.
+Linux и macOS: `./start.sh` ставит зависимости и запускает Streamlit; `./start.sh --update` перед этим делает `git pull`.
 
 Командная строка, без окна:
 
@@ -200,7 +179,7 @@ CI на GitHub Actions гоняет `ruff format --check`, `ruff check` и `pyte
 
 - Инструменты файлов не выходят из выбранной папки. Папка с тем же префиксом имени (`workspace` и `workspace_evil`) тоже снаружи.
 - Перед перезаписью и удалением копия кладётся в `backups/`.
-- Shell режет известные опасные шаблоны вроде `rm -rf /`.
+- Shell режет известные опасные шаблоны вроде `rm -rf /`, не выпускает рабочую папку команды за пределы проекта и не передаёт командам переменные с ключами и токенами. Это страховка, а не песочница: запущенная команда может всё, что может ваша учётная запись.
 - SSH выполняется только на хост из формы. Ключ предпочтительнее пароля, пароль форма не спрашивает.
 
 Не кладите боевые ключи в репозиторий и не отправляйте в бесплатные API данные, которые нельзя отдавать провайдеру: у free tier Google контент может использоваться для улучшения продуктов, у части бесплатных маршрутов OpenRouter политика другая. Это написано в карточке модели.
@@ -213,4 +192,4 @@ Multi-Agent Studio is a local Streamlit app: several roles share a task, each wi
 
 Quick start: create a virtualenv, `pip install -r requirements.txt`, copy `.env.example` to `.env`, then `streamlit run app.py`. The default roles use Gemini’s free tier (`GOOGLE_API_KEY`). OpenRouter `:free` models and local Ollama tags need no per-token fee. Paid Claude, GPT, Grok, DeepSeek, Mistral, Groq, and Cerebras models are in the same picker.
 
-Prices were checked on **9 November 2026**. The Russian table above is the full list. `unknown` means the official number could not be verified and was not guessed. The left menu replaces stock tabs. Headings use Literata, body text Golos Text, and code JetBrains Mono, all with Cyrillic. The sidebar switches four themes (Paper, Night, Kiln, Pine); the choice is stored in `user_settings.json`. CI runs Ruff and pytest. See `config/models_catalog.yaml` for the source URL on every row.
+Prices were checked on **9 November 2026**. The Russian table above is the full list. `unknown` means the official number could not be verified and was not guessed. The sidebar has five sections and a theme switch: Auto (follows the system), Light, Dark; the choice is stored in `user_settings.json`. Runs happen in the background with a live log and a Stop button. CI runs Ruff and pytest. See `config/models_catalog.yaml` for the source URL on every row.

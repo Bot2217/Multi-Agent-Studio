@@ -99,3 +99,96 @@ def test_recommendations_resolve_to_litellm_ids():
     ids = orch.recommendations("developer")
     assert "gemini/gemini-3.8-flash" in ids
     assert resolve_model(cfg, "grok_47") == "xai/grok-4.7"
+
+
+def _fake_runtime(behaviour):
+    class FakeRuntime:
+        def __init__(self, **kwargs):
+            self.name = kwargs["role_name"]
+
+        def run(self, task, context=""):
+            return behaviour(self.name, context)
+
+    return FakeRuntime
+
+
+def test_failing_role_keeps_earlier_reports(tmp_path, monkeypatch):
+    def behaviour(name, context):
+        if name == "Ревьюер":
+            raise RuntimeError("квота кончилась")
+        return "код написан"
+
+    monkeypatch.setattr("core.orchestrator.AgentRuntime", _fake_runtime(behaviour))
+    orch = Orchestrator(
+        workspace=str(tmp_path),
+        backup_dir=str(tmp_path / "backups"),
+        api_keys={"GOOGLE_API_KEY": "k"},
+        config=load_config(),
+        pipeline_name="code_only",
+    )
+    result = orch.run("hello")
+    assert orch.outcome == "failed"
+    assert "код написан" in result
+    assert "квота кончилась" in result
+
+
+def test_stop_between_roles(tmp_path, monkeypatch):
+    flag = {"stop": False}
+
+    def behaviour(name, context):
+        flag["stop"] = True
+        return "первый шаг"
+
+    monkeypatch.setattr("core.orchestrator.AgentRuntime", _fake_runtime(behaviour))
+    orch = Orchestrator(
+        workspace=str(tmp_path),
+        backup_dir=str(tmp_path / "backups"),
+        api_keys={"GOOGLE_API_KEY": "k"},
+        config=load_config(),
+        pipeline_name="code_only",
+        should_stop=lambda: flag["stop"],
+    )
+    result = orch.run("hello")
+    assert orch.outcome == "stopped"
+    assert "первый шаг" in result
+    assert "Ревьюер" not in result.split("Steps:")[1].split("\n", 1)[1]
+
+
+def test_handoff_prefers_the_role_summary():
+    from core.orchestrator import handoff
+
+    long_summary = "=== ИТОГ (Разработчик) ===\n" + "сделано " * 60
+    assert handoff("шум " * 5000 + long_summary).startswith("=== ИТОГ")
+    assert len(handoff("x" * 20000)) == 6000
+
+
+def test_run_job_writes_report_and_finishes(tmp_path, monkeypatch):
+    from core.runner import RunJob
+
+    monkeypatch.setattr("core.orchestrator.AgentRuntime", _fake_runtime(lambda n, c: "готово"))
+    job = RunJob(
+        task="hello",
+        results_dir=tmp_path / "results",
+        workspace=str(tmp_path),
+        backup_dir=str(tmp_path / "backups"),
+        api_keys={"GOOGLE_API_KEY": "k"},
+        config=load_config(),
+        pipeline_name="single",
+    ).start()
+    job.join(10)
+    assert job.outcome == "ok"
+    assert not job.running
+    assert job.step == (1, 1, "Разработчик")
+    assert "готово" in job.report_path.read_text(encoding="utf-8")
+
+
+def test_agent_stops_when_asked(tmp_path):
+    import pytest
+
+    from core.agent_runtime import AgentRuntime, RunStopped
+
+    runtime = AgentRuntime(
+        str(tmp_path), str(tmp_path / "b"), api_key="x", should_stop=lambda: True
+    )
+    with pytest.raises(RunStopped):
+        runtime.run("задача")

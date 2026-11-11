@@ -1,21 +1,44 @@
-"""Four studio themes. Colors are chosen so body text stays readable."""
+"""Two standard themes, light and dark, plus "auto" that follows the system setting."""
 
 from __future__ import annotations
 
-DEFAULT_THEME = "paper"
-THEME_ORDER = ("paper", "night", "kiln", "pine")
+DEFAULT_THEME = "auto"
+THEME_ORDER = ("auto", "light", "dark")
+THEME_LABELS = {"auto": "Авто", "light": "Светлая", "dark": "Тёмная"}
+# Themes saved by older versions map onto the two that remain.
+LEGACY_THEMES = {"paper": "light", "kiln": "light", "night": "dark", "pine": "dark"}
+
 # Left-hand menu. First item is the home flow.
 SCREENS = (
     ("run", "Запуск"),
     ("agents", "Агенты"),
     ("models", "Модели"),
     ("files", "Файлы"),
-    ("ssh", "SSH"),
-    ("help", "Справка"),
+    ("settings", "Настройки"),
 )
+LEGACY_SCREENS = {"ssh": "settings", "help": "settings"}
 
-# Shared badge pairs. Light sheets for paper/kiln, dark chips for night/pine.
-_LIGHT_BADGES = {
+DEFAULT_PALETTE = "graphite"
+PALETTE_ORDER = ("graphite", "warm")
+PALETTE_LABELS = {"graphite": "Графит", "warm": "Тёплая"}
+
+_COOL_LIGHT_BADGES = {
+    "free": {"bg": "#dcefe3", "fg": "#17603a"},
+    "freemium": {"bg": "#e1eafb", "fg": "#1f4aa8"},
+    "paid": {"bg": "#eceef1", "fg": "#3d4550"},
+    "local": {"bg": "#ece6f8", "fg": "#573897"},
+    "unknown": {"bg": "#f3eeda", "fg": "#6a5210"},
+    "deprecated": {"bg": "#fbe4e0", "fg": "#8f2a1c"},
+}
+_COOL_DARK_BADGES = {
+    "free": {"bg": "#173626", "fg": "#9be0b8"},
+    "freemium": {"bg": "#1c2c4f", "fg": "#a9c4fb"},
+    "paid": {"bg": "#2a2e34", "fg": "#cfd5dd"},
+    "local": {"bg": "#2c2444", "fg": "#cbb6f5"},
+    "unknown": {"bg": "#3a3118", "fg": "#ecd58a"},
+    "deprecated": {"bg": "#45211c", "fg": "#f5b5aa"},
+}
+_WARM_LIGHT_BADGES = {
     "free": {"bg": "#dce8df", "fg": "#1a4a34"},
     "freemium": {"bg": "#f3d7cf", "fg": "#7a2a1c"},
     "paid": {"bg": "#f6d9d2", "fg": "#7a2418"},
@@ -23,7 +46,7 @@ _LIGHT_BADGES = {
     "unknown": {"bg": "#e6e1d8", "fg": "#3f382f"},
     "deprecated": {"bg": "#f6e3c4", "fg": "#6a3d08"},
 }
-_DARK_BADGES = {
+_WARM_DARK_BADGES = {
     "free": {"bg": "#1e3d30", "fg": "#b7e2c8"},
     "freemium": {"bg": "#3d241c", "fg": "#f0c2b2"},
     "paid": {"bg": "#4a241c", "fg": "#f3c2b4"},
@@ -32,91 +55,109 @@ _DARK_BADGES = {
     "deprecated": {"bg": "#4a3414", "fg": "#f3d7a4"},
 }
 
-THEMES: dict[str, dict] = {
-    "paper": {
-        "id": "paper",
-        "label": "Бумага",
-        "kicker": "типография",
-        "blurb": "Тёплая бумага и красная краска печатного станка.",
-        "mode": "light",
-        "bg": "#f4efe4",
-        "surface": "#fffaf3",
-        "sidebar": "#ebe3d4",
-        "ink": "#241c14",
-        "muted": "#5c5146",
-        "line": "#d9cfc0",
-        "accent": "#b8432f",
-        "on_accent": "#fffaf3",
-        "link": "#1e4d3c",
-        "note": "#fff6e8",
-        "badges": _LIGHT_BADGES,
+# graphite: charcoal with a lime accent. warm: the original paper and night colors.
+PALETTES: dict[str, dict[str, dict]] = {
+    "graphite": {
+        "light": {
+            "id": "graphite-light",
+            "mode": "light",
+            "bg": "#f1f2f5",
+            "surface": "#fbfbfc",
+            "raised": "#eceef2",
+            "sidebar": "#e9ebef",
+            "ink": "#14161b",
+            "muted": "#596070",
+            "line": "#d9dce3",
+            "accent": "#2c6a12",
+            "on_accent": "#f6fbf1",
+            "accent_soft": "rgba(44, 106, 18, 0.10)",
+            "link": "#2c6a12",
+            "note": "#e8f1e2",
+            "danger": "#a3261c",
+            "ok": "#1c6a44",
+            "badges": _COOL_LIGHT_BADGES,
+        },
+        "dark": {
+            "id": "graphite-dark",
+            "mode": "dark",
+            "bg": "#0d0e12",
+            "surface": "#15171d",
+            "raised": "#1c1f27",
+            "sidebar": "#0b0c0f",
+            "ink": "#eef0f4",
+            "muted": "#9aa3b2",
+            "line": "#272b35",
+            "accent": "#c2f24e",
+            "on_accent": "#12160a",
+            "accent_soft": "rgba(194, 242, 78, 0.12)",
+            "link": "#c2f24e",
+            "note": "#1b2112",
+            "danger": "#ff9c94",
+            "ok": "#6fe0a8",
+            "badges": _COOL_DARK_BADGES,
+        },
     },
-    "night": {
-        "id": "night",
-        "label": "Ночь",
-        "kicker": "ночная смена",
-        "blurb": "Тёмная мастерская, латунная вывеска, без синего свечения.",
-        "mode": "dark",
-        "bg": "#17130f",
-        "surface": "#241e18",
-        "sidebar": "#100e0b",
-        "ink": "#f6f1e7",
-        "muted": "#d2c4b0",
-        "line": "#3a322a",
-        "accent": "#e0a15a",
-        "on_accent": "#1c140c",
-        "link": "#f0c48a",
-        "note": "#2c2418",
-        "badges": _DARK_BADGES,
-    },
-    "kiln": {
-        "id": "kiln",
-        "label": "Обжиг",
-        "kicker": "глина и жар",
-        "blurb": "Глиняный стол и горящая глазурь. Самая тёплая тема.",
-        "mode": "light",
-        "bg": "#f8e6d2",
-        "surface": "#fff7ee",
-        "sidebar": "#f0d2b4",
-        "ink": "#2b160f",
-        "muted": "#6d4a38",
-        "line": "#e2c2a4",
-        "accent": "#c2410c",
-        "on_accent": "#fff7ee",
-        "link": "#8d3014",
-        "note": "#fff1e2",
-        "badges": _LIGHT_BADGES,
-    },
-    "pine": {
-        "id": "pine",
-        "label": "Хвоя",
-        "kicker": "лесная смена",
-        "blurb": "Глубокая зелень и лимонный акцент, как хвоя на срезе.",
-        "mode": "dark",
-        "bg": "#10241c",
-        "surface": "#1a3329",
-        "sidebar": "#0b1a14",
-        "ink": "#f4f7ec",
-        "muted": "#c9d7c4",
-        "line": "#2d4a3c",
-        "accent": "#d6ef6a",
-        "on_accent": "#14200c",
-        "link": "#e4f08a",
-        "note": "#1c382c",
-        "badges": _DARK_BADGES,
+    "warm": {
+        "light": {
+            "id": "warm-light",
+            "mode": "light",
+            "bg": "#f4efe4",
+            "surface": "#fffaf3",
+            "raised": "#ebe3d4",
+            "sidebar": "#ebe3d4",
+            "ink": "#241c14",
+            "muted": "#5c5146",
+            "line": "#d9cfc0",
+            "accent": "#b8432f",
+            "on_accent": "#fffaf3",
+            "accent_soft": "rgba(184, 67, 47, 0.10)",
+            "link": "#1e4d3c",
+            "note": "#fff6e8",
+            "danger": "#8c2f24",
+            "ok": "#1a4a34",
+            "badges": _WARM_LIGHT_BADGES,
+        },
+        "dark": {
+            "id": "warm-dark",
+            "mode": "dark",
+            "bg": "#17130f",
+            "surface": "#241e18",
+            "raised": "#2c2418",
+            "sidebar": "#100e0b",
+            "ink": "#f6f1e7",
+            "muted": "#d2c4b0",
+            "line": "#3a322a",
+            "accent": "#e0a15a",
+            "on_accent": "#1c140c",
+            "accent_soft": "rgba(224, 161, 90, 0.14)",
+            "link": "#f0c48a",
+            "note": "#2c2418",
+            "danger": "#f3c2b4",
+            "ok": "#b7e2c8",
+            "badges": _WARM_DARK_BADGES,
+        },
     },
 }
+# Kept for older imports: the warm pair.
+THEMES = PALETTES["warm"]
+
+
+def resolve_palette(name: str | None) -> str:
+    key = str(name or "").strip().lower()
+    return key if key in PALETTES else DEFAULT_PALETTE
 
 
 def resolve_theme(name: str | None) -> str:
     key = str(name or "").strip().lower()
-    if key in THEMES:
+    key = LEGACY_THEMES.get(key, key)
+    if key in THEME_ORDER:
         return key
     return DEFAULT_THEME
 
 
 def resolve_screen(name: str | None) -> str:
     key = str(name or "").strip().lower()
+    key = LEGACY_SCREENS.get(key, key)
     known = {screen_id for screen_id, _label in SCREENS}
     if key in known:
         return key
@@ -149,10 +190,16 @@ def contrast_issues(theme: dict) -> list[str]:
     checks = [
         ("ink on bg", theme["ink"], theme["bg"], 7.0),
         ("ink on surface", theme["ink"], theme["surface"], 7.0),
-        ("muted on bg", theme["muted"], theme["bg"], 4.5),
         ("ink on sidebar", theme["ink"], theme["sidebar"], 7.0),
+        ("ink on note", theme["ink"], theme["note"], 7.0),
+        ("muted on bg", theme["muted"], theme["bg"], 4.5),
+        ("muted on surface", theme["muted"], theme["surface"], 4.5),
+        ("muted on sidebar", theme["muted"], theme["sidebar"], 4.5),
         ("button label on accent", theme["on_accent"], theme["accent"], 4.5),
+        ("accent on surface", theme["accent"], theme["surface"], 4.5),
         ("link on bg", theme["link"], theme["bg"], 4.5),
+        ("danger on surface", theme["danger"], theme["surface"], 4.5),
+        ("ok on surface", theme["ok"], theme["surface"], 4.5),
     ]
     for name, colors in theme["badges"].items():
         checks.append((f"badge {name}", colors["fg"], colors["bg"], 4.5))
@@ -164,310 +211,387 @@ def contrast_issues(theme: dict) -> list[str]:
     return issues
 
 
-def theme_stylesheet(theme_id: str | None) -> str:
-    theme = THEMES[resolve_theme(theme_id)]
+def _variables(theme: dict) -> str:
+    lines = [f"color-scheme: {theme['mode']};"]
+    for key in (
+        "bg",
+        "surface",
+        "raised",
+        "sidebar",
+        "ink",
+        "muted",
+        "line",
+        "accent",
+        "on_accent",
+        "accent_soft",
+        "link",
+        "note",
+        "danger",
+        "ok",
+    ):
+        lines.append(f"--{key.replace('_', '-')}: {theme[key]};")
+    for name, colors in theme["badges"].items():
+        lines.append(f"--badge-{name}-bg: {colors['bg']};")
+        lines.append(f"--badge-{name}-fg: {colors['fg']};")
+    return "\n  ".join(lines)
+
+
+FONT_IMPORT = (
+    "@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700"
+    "&family=JetBrains+Mono:wght@400;500&display=swap');"
+)
+
+
+def theme_stylesheet(theme_id: str | None, palette: str | None = None) -> str:
+    choice = resolve_theme(theme_id)
+    pair = PALETTES[resolve_palette(palette)]
+    if choice == "auto":
+        colors = (
+            f":root {{\n  {_variables(pair['light'])}\n}}\n"
+            "@media (prefers-color-scheme: dark) {\n"
+            f":root {{\n  {_variables(pair['dark'])}\n}}\n}}"
+        )
+    else:
+        colors = f":root {{\n  {_variables(pair[choice])}\n}}"
     badge_css = "\n".join(
-        f".badge-{name} {{ background: {colors['bg']}; color: {colors['fg']}; }}"
-        for name, colors in theme["badges"].items()
+        f".badge-{name} {{ background: var(--badge-{name}-bg); color: var(--badge-{name}-fg); }}"
+        for name in pair["light"]["badges"]
     )
-    return f"""
-<style>
-@import url('https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Literata:opsz,wght@7..72,560;7..72,680&display=swap');
-/* theme:{theme["id"]} fonts:Literata,Golos Text,JetBrains Mono cyrillic */
-:root {{
-  --bg: {theme["bg"]};
-  --surface: {theme["surface"]};
-  --sidebar: {theme["sidebar"]};
-  --ink: {theme["ink"]};
-  --muted: {theme["muted"]};
-  --line: {theme["line"]};
-  --accent: {theme["accent"]};
-  --on-accent: {theme["on_accent"]};
-  --link: {theme["link"]};
-  --note: {theme["note"]};
-  --danger: #8c2f24;
-  --on-danger: #fffaf3;
-  --font-display: Literata, Palatino, "Palatino Linotype", Georgia, serif;
-  --font-body: "Golos Text", "Segoe UI", sans-serif;
-  --font-mono: "JetBrains Mono", ui-monospace, monospace;
-  --space-1: 4px;
-  --space-2: 8px;
-  --space-3: 12px;
-  --space-4: 16px;
-  --space-5: 24px;
-  --space-6: 32px;
-  --radius-s: 8px;
-  --radius-m: 14px;
-  --radius-l: 20px;
-  --radius-pill: 999px;
-  --shadow: 4px 4px 0 var(--line);
-  --type-xs: 0.75rem;
-  --type-sm: 0.875rem;
-  --type-md: 1rem;
-  --type-lg: 1.35rem;
-  --type-xl: 2.15rem;
-}}
-html, body, .stApp, [data-testid="stMarkdown"], p, li, label, input, textarea {{
+    return (
+        f"<style>\n{FONT_IMPORT}\n/* theme:{choice} palette:{resolve_palette(palette)} */\n"
+        f"{colors}\n{_BASE_CSS}\n{badge_css}\n</style>"
+    )
+
+
+_BASE_CSS = """
+:root {
+  --font-body: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px; --space-5: 24px; --space-6: 32px;
+  --radius-s: 8px; --radius-m: 12px; --radius-pill: 999px;
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+  --type-xs: 0.75rem; --type-sm: 0.875rem; --type-md: 1rem; --type-lg: 1.25rem; --type-xl: 1.75rem;
+}
+html, body, .stApp, :root body p, :root body li, :root body label, :root body input, :root body textarea, :root body button,
+[data-testid="stMarkdownContainer"] {
   font-family: var(--font-body);
-}}
-html, body, .stApp {{
+}
+html, body, .stApp, [data-testid="stAppViewContainer"], [data-testid="stMain"] {
   background: var(--bg);
   color: var(--ink);
-  font-size: var(--type-md);
-}}
-.stApp::before {{
-  content: "";
-  pointer-events: none;
-  position: fixed;
-  inset: 0;
-  opacity: 0.045;
-  background-image: radial-gradient(var(--ink) 0.6px, transparent 0.65px);
-  background-size: 4px 4px;
-  z-index: 0;
-}}
-.block-container {{
-  padding-top: var(--space-5);
-  padding-bottom: 3.5rem;
-  max-width: 1080px;
-  position: relative;
-  z-index: 1;
-}}
-header[data-testid="stHeader"] {{ background: transparent; }}
-[data-testid="stSidebar"] {{
+}
+.block-container { padding-top: 2.5rem; padding-bottom: 4rem; max-width: 880px; }
+header[data-testid="stHeader"] { background: transparent; }
+[data-testid="stSidebar"], [data-testid="stSidebar"] > div:first-child {
   background: var(--sidebar);
-  border-right: 1px solid var(--line);
-}}
-[data-testid="stSidebar"] > div:first-child {{
-  background: var(--sidebar);
-}}
-h1, h2, h3, [data-testid="stMetricValue"] {{
-  font-family: var(--font-display);
-  letter-spacing: -0.03em;
-  color: var(--ink);
-  font-weight: 680;
-}}
-h1 {{ font-size: var(--type-xl); line-height: 1.05; }}
-h2 {{ font-size: var(--type-lg); margin: 0; border: 0; padding: 0; }}
-h3 {{ font-size: 1.05rem; }}
-p, li, label, .stMarkdown {{ color: var(--ink); }}
-code, pre, kbd, samp, [data-testid="stCode"], .stCode {{
-  font-family: var(--font-mono) !important;
-}}
-a {{ color: var(--link); }}
-.stCaption, [data-testid="stCaptionContainer"] p {{ color: var(--muted) !important; }}
-[data-testid="stMetric"] {{
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-m);
-  padding: var(--space-2) var(--space-4) var(--space-3);
-  box-shadow: var(--shadow);
-  transition: border-color 160ms ease, transform 160ms ease;
-}}
-[data-testid="stMetric"]:hover {{
-  border-color: var(--accent);
-  transform: translateY(-1px);
-}}
-[data-testid="stMetricLabel"] {{ color: var(--muted) !important; }}
-[data-testid="stMetricValue"] {{ color: var(--ink) !important; }}
-div[data-testid="stButton"] > button {{
+}
+[data-testid="stSidebar"] { border-right: 1px solid var(--line); }
+:root body h1, :root body h2, :root body h3, :root body h4 {
+  font-family: var(--font-body); color: var(--ink); letter-spacing: -0.01em; font-weight: 650;
+}
+:root body h1 { font-size: var(--type-xl); line-height: 1.15; padding: 0 0 var(--space-2); }
+:root body h2 { font-size: var(--type-lg); padding: var(--space-4) 0 var(--space-1); }
+:root body h3 { font-size: 1.05rem; padding: var(--space-3) 0 var(--space-1); }
+:root body p, :root body li, :root body label, [data-testid="stWidgetLabel"] p { color: var(--ink); }
+:root body a { color: var(--link); }
+:root body code, :root body pre, [data-testid="stCode"] * { font-family: var(--font-mono) !important; }
+:root body :not(pre) > code {
+  background: var(--note); color: var(--ink); border-radius: 4px; padding: 0.1em 0.35em;
+}
+[data-testid="stCode"], [data-testid="stCode"] pre {
+  background: var(--surface) !important; color: var(--ink) !important;
   border-radius: var(--radius-s);
-  font-family: var(--font-body);
-  font-weight: 600;
-  min-height: 42px;
-  padding: 0.35rem 0.9rem;
-  transition: transform 140ms ease, background 140ms ease, border-color 140ms ease, box-shadow 140ms ease;
-}}
-div[data-testid="stButton"] > button:hover {{ transform: translateY(-1px); }}
-div[data-testid="stButton"] > button:active {{ transform: translateY(0); }}
-div[data-testid="stButton"] > button[kind="primary"] {{
-  background: var(--accent);
-  color: var(--on-accent);
-  border: 1px solid var(--accent);
-  box-shadow: var(--shadow);
-}}
-div[data-testid="stButton"] > button[kind="secondary"] {{
-  background: var(--surface);
-  color: var(--ink);
-  border: 1px solid var(--line);
-}}
-div[data-testid="stButton"] > button[kind="tertiary"] {{
-  background: transparent;
-  color: var(--muted);
-  border: 1px solid transparent;
-  box-shadow: none;
-  min-height: 36px;
-}}
-div[data-testid="stButton"] > button[kind="tertiary"]:hover {{
-  color: var(--ink);
-  background: var(--surface);
-}}
-[class*="st-key-danger"] button {{
-  background: var(--danger) !important;
-  color: var(--on-danger) !important;
-  border-color: var(--danger) !important;
-}}
-[class*="st-key-nav_"] button {{
-  justify-content: flex-start;
-  text-align: left;
-  border-radius: var(--radius-s);
-  box-shadow: none;
-  min-height: 40px;
-}}
-[class*="st-key-nav_"] button[kind="primary"] {{
-  box-shadow: inset 4px 0 0 var(--on-accent);
-}}
-[class*="st-key-launch_run"] button {{
-  min-height: 52px;
-  font-size: 1.05rem;
-  border-radius: var(--radius-m);
-}}
-div[data-testid="stButton"] > button:focus-visible {{
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-}}
-[data-baseweb="input"], [data-baseweb="textarea"], [data-baseweb="select"] > div {{
+}
+[data-testid="stCode"] { border: 1px solid var(--line); }
+[data-testid="stCode"] pre code, [data-testid="stCode"] pre span {
+  color: var(--ink) !important; background: transparent !important;
+}
+[data-testid="stCode"] pre ~ div, [data-testid="stCode"] code ~ div > div {
+  background: var(--surface) !important; color: var(--muted);
+}
+[data-testid="stCaptionContainer"], [data-testid="stCaptionContainer"] p { color: var(--muted) !important; }
+:root body p.lead { color: var(--muted); margin: 0 0 var(--space-3); }
+
+/* Buttons */
+:root body button[kind], :root body [data-testid="stDownloadButton"] button {
+  border-radius: var(--radius-s); font-weight: 550; min-height: 40px;
+  transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
+}
+:root body button[kind="primary"], :root body button[kind="primaryFormSubmit"] {
+  background: var(--accent); color: var(--on-accent); border: 1px solid var(--accent);
+}
+:root body button[kind="primary"] p, :root body button[kind="primaryFormSubmit"] p { color: var(--on-accent); }
+:root body button[kind="primary"]:hover, :root body button[kind="primaryFormSubmit"]:hover {
+  filter: brightness(1.08); color: var(--on-accent); border-color: var(--accent);
+}
+:root body button[kind="secondary"], :root body button[kind="secondaryFormSubmit"],
+:root body [data-testid="stDownloadButton"] button, :root body [data-testid="stPopover"] button {
+  background: var(--surface); color: var(--ink); border: 1px solid var(--line);
+}
+:root body button[kind="secondary"]:hover, :root body button[kind="secondaryFormSubmit"]:hover,
+:root body [data-testid="stDownloadButton"] button:hover, :root body [data-testid="stPopover"] button:hover {
+  border-color: var(--accent); color: var(--accent);
+}
+:root body button[kind="secondary"]:hover p { color: var(--accent); }
+:root body button[kind="tertiary"] { background: transparent; color: var(--muted); border: 1px solid transparent; }
+:root body button[kind="tertiary"] p { color: var(--muted); }
+:root body button[kind="tertiary"]:hover p { color: var(--ink); }
+:root body button:disabled, :root body button:disabled p { cursor: not-allowed; }
+:root body button[kind]:disabled {
+  background: var(--line); border-color: var(--line); color: var(--muted); filter: none;
+}
+:root body button[kind]:disabled p { color: var(--muted); }
+:root body textarea:disabled, :root body input:disabled {
+  color: var(--muted) !important; -webkit-text-fill-color: var(--muted); opacity: 1;
+}
+:root body button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+:root body [class*="st-key-launch_run"] button { min-height: 48px; font-size: 1.02rem; }
+:root body [class*="st-key-stop_run"] button { color: var(--danger); border-color: var(--line); }
+:root body [class*="st-key-stop_run"] button p { color: var(--danger); }
+
+/* Sidebar navigation */
+.brand { font-weight: 700; font-size: 1.05rem; color: var(--ink); margin: 0 0 var(--space-4); }
+.brand span { color: var(--accent); }
+:root body [data-testid="stSidebar"] [class*="st-key-nav_"] button {
+  justify-content: flex-start; text-align: left; min-height: 38px;
+  background: transparent; border: 1px solid transparent; color: var(--ink);
+}
+:root body [data-testid="stSidebar"] [class*="st-key-nav_"] button > div,
+:root body [data-testid="stSidebar"] [class*="st-key-nav_"] button > span {
+  justify-content: flex-start; width: 100%; gap: var(--space-2);
+}
+:root body [data-testid="stSidebar"] [class*="st-key-nav_"] button p { color: inherit; font-weight: 500; }
+:root body [data-testid="stSidebar"] [class*="st-key-nav_"] button:hover { background: var(--surface); color: var(--ink); }
+:root body [data-testid="stSidebar"] [class*="st-key-nav_"] button[kind="primary"] {
+  background: var(--surface); border-color: var(--line); color: var(--accent); box-shadow: var(--shadow);
+  filter: none;
+}
+:root body [data-testid="stSidebar"] [class*="st-key-nav_"] button[kind="primary"] p { font-weight: 650; color: var(--accent); }
+[data-testid="stSidebar"] [data-testid="stVerticalBlock"] { gap: 0.3rem; }
+.side-label {
+  font-size: var(--type-xs); color: var(--muted); text-transform: uppercase;
+  letter-spacing: 0.06em; margin: var(--space-5) 0 var(--space-2); padding-left: 2px;
+}
+
+/* Inputs */
+:root body [data-baseweb="input"], :root body [data-baseweb="base-input"], :root body [data-baseweb="textarea"],
+:root body [data-baseweb="select"] > div, :root body [data-testid="stNumberInputContainer"] {
+  background-color: var(--surface) !important; color: var(--ink) !important;
+  border-color: var(--line) !important; border-radius: var(--radius-s) !important;
+}
+:root body [data-baseweb="input"]:focus-within, :root body [data-baseweb="textarea"]:focus-within,
+:root body [data-baseweb="select"] > div:focus-within { border-color: var(--accent) !important; }
+:root body input, :root body textarea, :root body [data-baseweb="select"] div, :root body [data-baseweb="select"] span {
+  color: var(--ink) !important; caret-color: var(--ink); -webkit-text-fill-color: var(--ink);
+}
+:root body [data-baseweb="input"] input, :root body [data-baseweb="base-input"] input,
+:root body [data-baseweb="textarea"] textarea, :root body [data-baseweb="base-input"] {
   background-color: var(--surface) !important;
-  color: var(--ink) !important;
-  border-color: var(--line) !important;
-  border-radius: var(--radius-s) !important;
-}}
-[data-baseweb="input"] input, textarea, [data-baseweb="select"] span {{
-  color: var(--ink) !important;
-  caret-color: var(--ink);
-  font-family: var(--font-body) !important;
-}}
-textarea {{ min-height: 140px; }}
-[data-testid="stSlider"] [role="slider"] {{
-  background: var(--accent) !important;
-  border: 2px solid var(--surface) !important;
-}}
-[data-testid="stExpander"] details {{
-  background: var(--surface);
-  border: 1px solid var(--line) !important;
-  border-radius: var(--radius-m);
-  box-shadow: var(--shadow);
-}}
-[data-testid="stExpander"] summary {{
-  font-weight: 600;
-}}
-[data-testid="stAlert"],
-[data-testid="stAlert"] * {{
-  color: #241c14 !important;
-}}
-[data-testid="stAlert"] {{
-  background: #fff6e8 !important;
-  border: 1px solid #e4d3b4 !important;
-  border-left: 4px solid var(--accent) !important;
-  border-radius: var(--radius-m) !important;
-}}
-[data-testid="stSpinner"] {{ color: var(--accent); }}
-.sheet-wrap {{
-  max-height: 440px;
-  overflow: auto;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-m);
-  background: var(--surface);
-  box-shadow: var(--shadow);
-}}
-table.sheet {{
-  width: 100%;
-  border-collapse: collapse;
-  font-size: var(--type-sm);
-}}
-table.sheet th {{
-  position: sticky;
-  top: 0;
-  text-align: left;
-  font-family: var(--font-body);
-  font-size: var(--type-xs);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--muted);
-  background: var(--sidebar);
-  padding: var(--space-3);
-  border-bottom: 1px solid var(--line);
-}}
-table.sheet td {{
-  padding: var(--space-2) var(--space-3);
-  border-bottom: 1px solid var(--line);
-  vertical-align: middle;
-}}
-table.sheet tbody tr:hover td {{ background: color-mix(in srgb, var(--accent) 8%, transparent); }}
-.mast {{ display: flex; gap: var(--space-4); align-items: center; margin: 0 0 var(--space-4); }}
-.mark {{
-  width: 52px; height: 52px; border-radius: var(--radius-m);
-  background: var(--accent); color: var(--on-accent);
-  display: grid; place-items: center;
-  font-family: var(--font-display); font-weight: 680; font-size: 1.15rem;
-  box-shadow: var(--shadow);
-}}
-.kicker {{
-  font-family: var(--font-body);
-  font-size: var(--type-xs); letter-spacing: 0.14em; text-transform: uppercase;
-  color: var(--accent); font-weight: 700; margin: 0 0 var(--space-1);
-}}
-.studio-lead {{ color: var(--muted); margin: 0.25rem 0 0; font-size: 1.02rem; }}
-.mast h1 {{ margin: 0; font-size: 2.35rem; line-height: 0.95; }}
-.palette {{ display: flex; gap: 0.4rem; margin: 0.15rem 0 0.55rem; }}
-.palette i {{
-  width: 22px; height: 22px; border-radius: 50%;
-  border: 1px solid var(--line); display: inline-block;
-}}
-.badge {{
-  display: inline-block; padding: 0.12rem 0.55rem; border-radius: 999px;
-  font-size: 0.75rem; font-weight: 650; letter-spacing: 0.02em;
-  margin-right: 0.35rem; vertical-align: middle;
-}}
-{badge_css}
-.chain {{ display: flex; flex-wrap: wrap; gap: 0.45rem; align-items: center; margin: 0.35rem 0 0.85rem; }}
-.chip {{
-  background: var(--surface); color: var(--ink);
-  border: 1px solid var(--line); border-radius: 999px;
-  padding: 0.32rem 0.75rem; font-size: 0.88rem;
-  transition: border-color 140ms ease, transform 140ms ease;
-}}
-.chip:hover {{ border-color: var(--accent); transform: translateY(-1px); }}
-.chip.off {{ opacity: 0.55; text-decoration: line-through; }}
-.arrow {{ color: var(--muted); }}
-.detail-card, .slip {{
-  border: 1px solid var(--line); border-radius: 16px;
-  padding: 0.95rem 1.05rem 0.35rem; background: var(--surface);
-  box-shadow: 4px 4px 0 var(--line);
-}}
-.slip p:last-child {{ margin-bottom: 0.7rem; }}
-.step {{
-  display: flex;
-  gap: var(--space-3);
-  align-items: flex-start;
-  margin: var(--space-5) 0 var(--space-3);
-}}
-.step-no {{
-  flex: none;
-  width: 32px;
-  height: 32px;
+}
+:root body input::placeholder, :root body textarea::placeholder {
+  color: var(--muted) !important; -webkit-text-fill-color: var(--muted); opacity: 0.8;
+}
+:root body [data-baseweb="input"] button, :root body [data-testid="stNumberInputContainer"] button {
+  background: transparent !important; color: var(--muted) !important; border: 0 !important; min-height: 0;
+}
+:root body [data-baseweb="select"] svg { fill: var(--muted); color: var(--muted); }
+[data-baseweb="popover"] [data-baseweb="menu"], [data-baseweb="popover"] ul[role="listbox"],
+[data-baseweb="popover"] > div, [data-testid="stPopoverBody"], [data-baseweb="tooltip"] > div,
+[data-testid="stTooltipContent"] {
+  background: var(--surface) !important; color: var(--ink) !important;
+}
+[data-baseweb="popover"] > div, [data-testid="stPopoverBody"] {
+  border: 1px solid var(--line); border-radius: var(--radius-m) !important;
+}
+[data-baseweb="popover"] li[role="option"], [data-baseweb="popover"] li[role="option"] * {
+  color: var(--ink) !important; background: transparent;
+}
+[data-baseweb="popover"] li[role="option"]:hover, [data-baseweb="popover"] li[aria-selected="true"] {
+  background: var(--note) !important;
+}
+[data-testid="stPopoverBody"] *, [data-testid="stTooltipContent"] * { color: var(--ink); }
+[data-testid="stSlider"] [role="slider"] { background: var(--accent) !important; border: 2px solid var(--surface) !important; }
+[data-testid="stSlider"] [data-testid="stSliderThumbValue"] { color: var(--accent) !important; }
+[data-testid="stSlider"] [data-testid="stSliderTickBar"] * { color: var(--muted) !important; }
+:root body label[data-baseweb="checkbox"] > div:first-child { border-color: var(--line); }
+
+/* Current Streamlit widgets (no baseweb attributes) */
+:root body [data-testid="stTextAreaRootElement"], :root body [data-testid="stTextInputRootElement"],
+:root body [data-testid="stNumberInputContainer"], :root body [data-testid="stSelectbox"] [role="group"],
+:root body [data-testid="stMultiSelect"] [role="group"] {
+  background: var(--surface) !important; border-color: var(--line) !important; color: var(--ink);
   border-radius: var(--radius-s);
-  background: var(--accent);
-  color: var(--on-accent);
-  display: grid;
-  place-items: center;
-  font-family: var(--font-display);
-  font-weight: 680;
-}}
-.step h2 {{ font-size: var(--type-lg); }}
-.step-hint {{ color: var(--muted); margin: var(--space-1) 0 0; font-size: var(--type-sm); }}
-.st-key-result_panel {{
-  margin-top: var(--space-5);
+}
+:root body [data-testid="stTextAreaRootElement"]:focus-within,
+:root body [data-testid="stTextInputRootElement"]:focus-within,
+:root body [data-testid="stSelectbox"] [role="group"]:focus-within { border-color: var(--accent) !important; }
+:root body [data-testid="stSelectbox"] [role="group"] button { background: transparent; border: 0; min-height: 0; }
+:root body [data-testid="stSelectbox"] svg, :root body [data-testid="stTextInputRootElement"] svg { color: var(--muted); }
+[role="listbox"] {
+  background: var(--surface) !important; color: var(--ink) !important; border-color: var(--line) !important;
+}
+[role="option"], [role="option"] * { color: var(--ink) !important; }
+[role="option"]:hover, [role="option"][aria-selected="true"], [role="option"][data-highlighted],
+[role="option"][data-focused] { background: var(--note) !important; }
+[data-testid="stWidgetLabel"] svg, [data-testid="stTooltipIcon"] svg { color: var(--muted); }
+
+/* Pills and segmented control */
+:root body [data-testid="stButtonGroup"] button {
+  background: var(--surface); color: var(--ink); border: 1px solid var(--line); min-height: 34px;
+}
+:root body [data-testid="stButtonGroup"] button p { color: inherit; }
+:root body [data-testid="stButtonGroup"] button:hover { border-color: var(--accent); }
+:root body [data-testid="stButtonGroup"] button[aria-checked="true"],
+:root body [data-testid="stButtonGroup"] button[aria-pressed="true"] {
+  background: var(--note); color: var(--accent); border-color: var(--accent);
+}
+:root body [data-testid="stButtonGroup"] button[aria-checked="true"] p { font-weight: 650; }
+[data-testid="stSidebar"] [data-testid="stButtonGroup"] button { padding: 0 0.6rem; min-height: 32px; }
+[data-testid="stSidebar"] [data-testid="stButtonGroup"] button p { font-size: var(--type-sm); }
+[data-testid="stSidebar"] [data-testid="stButtonGroup"] [role="radiogroup"] { flex-wrap: nowrap; }
+
+/* Containers */
+[data-testid="stExpander"] details {
+  background: var(--surface); border: 1px solid var(--line) !important; border-radius: var(--radius-m);
+}
+[data-testid="stExpander"] summary, [data-testid="stExpander"] summary * { color: var(--ink); }
+[data-testid="stExpander"] summary:hover, [data-testid="stExpander"] summary:hover * { color: var(--accent); }
+[data-testid="stVerticalBlockBorderWrapper"], [data-testid="stForm"],
+:root body [class*="st-key-card_"], :root body .st-key-result_panel, :root body .st-key-live_panel {
+  border-color: var(--line) !important;
+}
+:root body [class*="st-key-card_"], :root body .st-key-result_panel, :root body .st-key-live_panel {
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-m);
   padding: var(--space-4);
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-m);
-  box-shadow: var(--shadow);
-}}
-@media (prefers-reduced-motion: reduce) {{
-  .stApp::before {{ display: none; }}
-  [data-testid="stMetric"], .chip, div[data-testid="stButton"] > button {{
-    transition: none; transform: none;
-  }}
-}}
-</style>
+}
+.st-key-result_panel h1, .st-key-result_panel h2 { font-size: 1.1rem; padding: var(--space-2) 0 0; }
+[data-testid="stAlert"] > div, [data-testid="stAlertContainer"] {
+  background: var(--note) !important; color: var(--ink) !important;
+  border: 1px solid var(--line) !important; border-radius: var(--radius-m) !important;
+}
+[data-testid="stAlert"] p, [data-testid="stAlert"] svg { color: var(--ink) !important; }
+hr { border-color: var(--line) !important; }
+
+/* Own pieces */
+.status { display: flex; gap: var(--space-2); align-items: center; font-weight: 600; margin: 0; }
+.status small { color: var(--muted); font-weight: 400; }
+.dot { width: 9px; height: 9px; border-radius: 50%; background: var(--muted); flex: none; }
+.dot.ok { background: var(--ok); }
+.dot.bad { background: var(--danger); }
+.dot.live { background: var(--accent); animation: pulse 1.2s ease-in-out infinite; }
+@keyframes pulse { 50% { opacity: 0.35; } }
+.badge {
+  display: inline-block; padding: 0.1rem 0.5rem; border-radius: var(--radius-pill);
+  font-size: var(--type-xs); font-weight: 600; margin-right: 0.35rem; vertical-align: middle;
+  white-space: nowrap;
+}
+.chain { display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; margin: 0 0 var(--space-2); }
+.chip {
+  background: var(--surface); color: var(--ink); border: 1px solid var(--line);
+  border-radius: var(--radius-pill); padding: 0.25rem 0.7rem; font-size: var(--type-sm);
+}
+.chip small { color: var(--muted); }
+.chip.nokey { border-style: dashed; }
+.arrow { color: var(--muted); }
+.empty {
+  border: 1px dashed var(--line); border-radius: var(--radius-m); padding: var(--space-5);
+  color: var(--muted); text-align: center;
+}
+.sheet-wrap {
+  max-height: 460px; overflow: auto; border: 1px solid var(--line);
+  border-radius: var(--radius-m); background: var(--surface);
+}
+table.sheet { width: 100%; border-collapse: collapse; font-size: var(--type-sm); }
+table.sheet th {
+  position: sticky; top: 0; text-align: left; font-size: var(--type-xs); font-weight: 600;
+  color: var(--muted); background: var(--sidebar); padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--line); white-space: nowrap;
+}
+table.sheet td {
+  padding: var(--space-2) var(--space-3); border-bottom: 1px solid var(--line);
+  color: var(--ink); vertical-align: middle;
+}
+table.sheet tr:last-child td { border-bottom: 0; }
+table.sheet td.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+table.sheet td small {
+  color: var(--muted); font-family: var(--font-mono); font-size: 0.72rem; white-space: nowrap;
+}
+table.sheet tbody tr:hover td { background: var(--note); }
+@media (prefers-reduced-motion: reduce) {
+  .dot.live { animation: none; }
+  :root body button[kind] { transition: none; }
+}
+/* Bento layer: cards, eyebrows, tags, tactile states */
+:root { --radius-l: 20px; --type-xl: clamp(1.6rem, 1.2vw + 1.1rem, 2.1rem); }
+:root body .block-container { max-width: 1120px; padding-top: 2rem; }
+:root body h1 { font-size: var(--type-xl); font-weight: 700; letter-spacing: -0.02em; line-height: 1.1; padding: 0; }
+:root body [class*="st-key-card_"], :root body .st-key-result_panel, :root body .st-key-live_panel {
+  border-radius: var(--radius-l); padding: 20px; transition: border-color 160ms ease;
+}
+:root body [class*="st-key-card_"]:hover { border-color: color-mix(in srgb, var(--accent) 35%, var(--line)); }
+:root body .st-key-live_panel { border-color: var(--accent); }
+:root body button[kind] {
+  transition: transform 120ms ease, background 140ms ease, border-color 140ms ease, box-shadow 140ms ease;
+  border-radius: 14px;
+}
+:root body button[kind]:active:not(:disabled) { transform: scale(0.97); }
+:root body button[kind="primary"]:hover:not(:disabled) { box-shadow: 0 0 0 4px var(--accent-soft); filter: none; }
+:root body [data-testid="stTextAreaRootElement"], :root body [data-testid="stTextInputRootElement"],
+:root body [data-testid="stSelectbox"] [role="group"] { border-radius: 14px; }
+:root body [data-testid="stTextAreaRootElement"]:focus-within,
+:root body [data-testid="stTextInputRootElement"]:focus-within,
+:root body [data-testid="stSelectbox"] [role="group"]:focus-within { box-shadow: 0 0 0 3px var(--accent-soft); }
+:root body .st-key-card_task [data-testid="stTextAreaRootElement"] { background: var(--bg) !important; }
+:root body .st-key-card_task textarea { font-size: 1rem; line-height: 1.5; background: transparent !important; }
+:root body p.eyebrow, .eyebrow {
+  font-size: var(--type-xs); font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--muted); margin: 0;
+}
+.page-head { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 16px; margin: 0 0 8px; }
+.page-head > div { display: flex; flex-direction: column; gap: 4px; }
+.page-head .tags { flex-direction: row; flex-wrap: wrap; gap: 8px; }
+:root body .page-head p.sub { color: var(--muted); font-size: var(--type-sm); margin: 4px 0 0; }
+.card-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 0 0 4px; }
+.tag {
+  display: inline-flex; align-items: center; height: 22px; padding: 0 8px; border-radius: 999px;
+  font-size: 11px; font-weight: 600; background: var(--accent-soft); color: var(--accent); white-space: nowrap;
+}
+.tag.quiet { background: var(--raised); color: var(--muted); }
+ol.steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+:root body ol.steps li {
+  display: flex; gap: 12px; align-items: center; padding: 12px; margin: 0;
+  border-radius: 14px; border: 1px solid var(--line); background: var(--raised);
+}
+:root body ol.steps li.nokey { border-style: dashed; background: transparent; }
+ol.steps .num {
+  width: 28px; height: 28px; border-radius: 9px; flex: none; display: grid; place-items: center;
+  background: var(--accent-soft); color: var(--accent); font-weight: 700; font-size: var(--type-sm);
+}
+ol.steps .who { display: flex; flex-direction: column; min-width: 0; line-height: 1.3; }
+ol.steps .who b { font-weight: 600; color: var(--ink); }
+ol.steps .who small { font-family: var(--font-mono); font-size: var(--type-xs); color: var(--muted); }
+ol.steps .tag { margin-left: auto; }
+.rows { display: flex; flex-direction: column; gap: 8px; }
+.rows .row { display: flex; align-items: center; gap: 10px; min-height: 28px; color: var(--ink); min-width: 0; }
+.rows .row svg { color: var(--accent); flex: none; }
+.rows .row .name { font-family: var(--font-mono); font-size: var(--type-sm); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rows .row .label { font-weight: 500; }
+.rows .row .state { margin-left: auto; font-size: var(--type-sm); color: var(--muted); white-space: nowrap; }
+.rows .row .state.ok { color: var(--ok); }
+.brand { display: flex; align-items: center; gap: 12px; }
+.brand svg { color: var(--accent); flex: none; }
+.brand b { display: block; font-weight: 700; font-size: 0.95rem; letter-spacing: -0.01em; line-height: 1.15; color: var(--ink); }
+.brand small { display: block; font-size: var(--type-xs); color: var(--muted); font-weight: 400; }
+.dot.live { box-shadow: 0 0 0 4px var(--accent-soft); }
+:root body [class*="st-key-ex_"] button, :root body [class*="st-key-hist_"] button {
+  min-height: 34px; border-radius: 999px; background: var(--raised); justify-content: flex-start;
+}
+:root body [class*="st-key-ex_"] button p, :root body [class*="st-key-hist_"] button p {
+  font-size: var(--type-sm); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+:root body [class*="st-key-hist_"] button { border-radius: 12px; width: 100%; }
+@media (prefers-reduced-motion: reduce) {
+  :root body button[kind], :root body [class*="st-key-card_"] { transition: none; }
+  :root body button[kind]:active:not(:disabled) { transform: none; }
+}
 """

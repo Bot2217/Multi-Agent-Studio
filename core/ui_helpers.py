@@ -33,6 +33,10 @@ def save_keys_to_env(keys, extra=None):
     for k, v in (keys or {}).items():
         if v and str(v).strip():
             existing[k] = str(v).strip()
+        elif k in existing:
+            # An emptied field removes the key instead of silently keeping the old one.
+            del existing[k]
+            os.environ.pop(k, None)
     if extra:
         for k, v in extra.items():
             if v and str(v).strip():

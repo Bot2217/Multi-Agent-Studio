@@ -46,9 +46,14 @@ class WorkspaceFS:
     def _backup(self, path: Path) -> Optional[Path]:
         if not path.exists():
             return None
-        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-        rel = path.relative_to(self.root) if str(path).startswith(str(self.root)) else path.name
-        dest = self.backup_dir / f"{ts}_{str(rel).replace(os.sep, '__')}"
+        ts = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+        rel = path.relative_to(self.root) if self._is_under(path, self.root) else path.name
+        stem = f"{ts}_{str(rel).replace(os.sep, '__')}"
+        dest = self.backup_dir / stem
+        counter = 1
+        while dest.exists():
+            dest = self.backup_dir / f"{stem}.{counter}"
+            counter += 1
         dest.parent.mkdir(parents=True, exist_ok=True)
         if path.is_dir():
             shutil.copytree(path, dest)

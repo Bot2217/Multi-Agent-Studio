@@ -7,12 +7,24 @@ from __future__ import annotations
 
 import json
 import re
+import time
 from typing import Any, Callable, Optional
 
 from tools.filesystem import WorkspaceFS
 from tools.power import PowerManager
 from tools.remote import RemoteDevice, RemoteManager
 from tools.shell import ShellRunner
+
+TOOL_FENCE_RE = re.compile(r"```tool\b", re.IGNORECASE)
+JSON_FENCE_RE = re.compile(r"^```(?:json)?\s*(.*?)\s*```$", re.DOTALL | re.IGNORECASE)
+# Errors worth a second try: the provider is busy or the network blinked.
+RETRYABLE = ("ratelimit", "timeout", "apiconnection", "serviceunavailable", "internalserver")
+RETRY_DELAYS = (3, 10)
+
+
+class RunStopped(Exception):
+    """Raised inside a run when the user asked to stop."""
+
 
 DEFAULT_SYSTEM = """Ты локальный агент-разработчик на компьютере пользователя (как Claude Code).
 
@@ -42,6 +54,7 @@ class AgentRuntime:
         system_prompt: Optional[str] = None,
         allowed_tools: Optional[list[str]] = None,
         role_name: str = "agent",
+        should_stop: Optional[Callable[[], bool]] = None,
     ):
         self.fs = WorkspaceFS(workspace, backup_dir)
         self.shell = ShellRunner(cwd=workspace, timeout=shell_timeout)
@@ -54,6 +67,7 @@ class AgentRuntime:
         self.max_steps = max_steps
         self.log = log_fn or (lambda s: None)
         self.role_name = role_name
+        self.should_stop = should_stop or (lambda: False)
         self.history: list[dict] = []
 
         all_tools: dict[str, Callable] = {
@@ -111,28 +125,63 @@ class AgentRuntime:
             "model": self.model,
             "messages": messages,
             "temperature": self.temperature,
+            # Some models reject temperature and similar knobs; drop them instead of failing.
+            "drop_params": True,
         }
         if self.api_key:
             kwargs["api_key"] = self.api_key
         if self.base_url:
             kwargs["api_base"] = self.base_url
 
-        resp = completion(**kwargs)
-        return resp.choices[0].message.content or ""
+        for delay in (*RETRY_DELAYS, None):
+            try:
+                resp = completion(**kwargs)
+                return resp.choices[0].message.content or ""
+            except Exception as exc:
+                kind = type(exc).__name__.lower()
+                if delay is None or not any(tag in kind for tag in RETRYABLE):
+                    raise
+                self.log(f"[{self.role_name}] {type(exc).__name__}, повтор через {delay} с")
+                self._sleep(delay)
+        return ""
+
+    def _sleep(self, seconds: float) -> None:
+        deadline = time.monotonic() + seconds
+        while time.monotonic() < deadline:
+            if self.should_stop():
+                raise RunStopped()
+            time.sleep(0.2)
+
+    @staticmethod
+    def _decode_call(text: str, start: int) -> Optional[dict]:
+        if start < 0:
+            return None
+        try:
+            obj, _end = json.JSONDecoder().raw_decode(text, start)
+        except json.JSONDecodeError:
+            return None
+        if isinstance(obj, dict) and isinstance(obj.get("name"), str) and obj["name"]:
+            return obj
+        return None
 
     def _parse_tool(self, text: str) -> Optional[dict]:
-        m = re.search(r"```tool\s*(\{.*?\})\s*```", text, re.DOTALL)
-        if m:
+        """A call is a ```tool block, or a reply that is nothing but one JSON object.
+
+        JSON mentioned inside prose is never executed: models quote examples.
+        """
+        fence = TOOL_FENCE_RE.search(text)
+        if fence:
+            return self._decode_call(text, text.find("{", fence.end()))
+        stripped = text.strip()
+        wrapped = JSON_FENCE_RE.match(stripped)
+        if wrapped:
+            stripped = wrapped.group(1)
+        if stripped.startswith("{") and stripped.endswith("}"):
             try:
-                return json.loads(m.group(1))
+                json.loads(stripped)
             except json.JSONDecodeError:
-                pass
-        m = re.search(r"\{[^{}]*\"name\"\s*:\s*\"[^\"]+\"[^{}]*\}", text, re.DOTALL)
-        if m:
-            try:
-                return json.loads(m.group(0))
-            except json.JSONDecodeError:
-                pass
+                return None
+            return self._decode_call(stripped, 0)
         return None
 
     def run(self, task: str, context: str = "") -> str:
@@ -151,6 +200,8 @@ class AgentRuntime:
         max_steps = 1 if only_finish else self.max_steps
 
         for step in range(1, max_steps + 1):
+            if self.should_stop():
+                raise RunStopped()
             self.log(f"[{self.role_name}] шаг {step}/{max_steps}")
             reply = self._llm(self.history)
             self.history.append({"role": "assistant", "content": reply})
@@ -174,6 +225,8 @@ class AgentRuntime:
 
             name = tool_call.get("name", "")
             args = tool_call.get("args") or tool_call.get("arguments") or {}
+            if not isinstance(args, dict):
+                args = {}
             self.log(f"[{self.role_name}] TOOL: {name} {args}")
 
             if name == "finish":

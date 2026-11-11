@@ -5,7 +5,6 @@ from __future__ import annotations
 import html
 import os
 import sys
-import traceback
 from datetime import datetime
 from pathlib import Path
 
@@ -16,28 +15,29 @@ ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT))
 load_dotenv(ROOT / ".env")
 
-from core.agent_runtime import AgentRuntime
 from core.catalog import (
     BILLING_BADGE,
     format_price,
     is_free_option,
     load_models_catalog,
     missing_credentials,
-    model_label,
     runnable_models,
     sorted_model_keys,
 )
-from core.orchestrator import Orchestrator, load_config
+from core.orchestrator import load_config
+from core.runner import RunJob
 from core.themes import (
+    PALETTE_LABELS,
+    PALETTE_ORDER,
     SCREENS,
+    THEME_LABELS,
     THEME_ORDER,
-    THEMES,
+    resolve_palette,
     resolve_screen,
     resolve_theme,
     theme_stylesheet,
 )
 from core.ui_helpers import (
-    KEY_NAMES,
     load_keys_from_env,
     load_user_settings,
     preset_paths,
@@ -46,845 +46,1017 @@ from core.ui_helpers import (
 )
 
 KEY_LABELS = [
+    ("Google", "GOOGLE_API_KEY", "Gemini, есть бесплатная квота"),
+    ("OpenRouter", "OPENROUTER_API_KEY", "модели с суффиксом :free"),
     ("Anthropic", "ANTHROPIC_API_KEY", "Claude"),
     ("OpenAI", "OPENAI_API_KEY", "GPT"),
-    ("Google", "GOOGLE_API_KEY", "Gemini, есть free tier"),
     ("xAI", "XAI_API_KEY", "Grok"),
     ("DeepSeek", "DEEPSEEK_API_KEY", "DeepSeek"),
-    ("Groq", "GROQ_API_KEY", "открытые модели Groq"),
-    ("OpenRouter", "OPENROUTER_API_KEY", "модели :free"),
+    ("Groq", "GROQ_API_KEY", "открытые модели на Groq"),
     ("Mistral", "MISTRAL_API_KEY", "Mistral и Codestral"),
     ("Cerebras", "CEREBRAS_API_KEY", "Cerebras"),
 ]
 
+SCREEN_ICONS = {
+    "run": ":material/play_arrow:",
+    "agents": ":material/group:",
+    "models": ":material/view_list:",
+    "files": ":material/folder:",
+    "settings": ":material/settings:",
+}
+
+PIPELINE_LABELS = {
+    "code_only": "Быстро: код и ревью",
+    "full": "Полный цикл",
+    "research_code": "Исследование и код",
+    "single": "Один разработчик",
+}
+
+BILLING_FILTERS = {
+    "Все": "all",
+    "Бесплатные": "free",
+    "Платные": "paid",
+    "Локальные": "local",
+}
+
 DEFAULT_WS = ROOT / "workspace"
 BACKUPS = ROOT / "backups"
 RESULTS = ROOT / "results"
-for folder in (DEFAULT_WS, BACKUPS, RESULTS):
-    folder.mkdir(exist_ok=True)
+SKIP_DIRS = {".git", ".venv", "venv", "node_modules", "__pycache__", ".pytest_cache"}
+FILE_LIMIT = 300
 
-BILLING_FILTERS = [
-    ("Все", "all"),
-    ("Бесплатные", "free"),
-    ("Платные", "paid"),
-    ("Локальные", "local"),
-    ("Цена unknown", "unknown"),
-]
-
-
-def inject_css() -> None:
-    st.markdown(theme_stylesheet(st.session_state.get("theme")), unsafe_allow_html=True)
+SETTING_DEFAULTS = {
+    "max_steps": 25,
+    "shell_timeout": 120,
+    "keep_awake": True,
+    "keep_display": False,
+    "ollama_base": "http://localhost:11434",
+}
 
 
-def slip(title: str, text: str) -> None:
-    st.markdown(
-        f'<div class="slip"><p class="kicker">{html.escape(title)}</p><p>{html.escape(text)}</p></div>',
-        unsafe_allow_html=True,
-    )
+# ---------- state ----------
 
 
-def step(number: str, title: str, hint: str = "") -> None:
-    hint_html = f'<p class="step-hint">{html.escape(hint)}</p>' if hint else ""
-    st.markdown(
-        (
-            '<div class="step">'
-            f'<span class="step-no">{html.escape(number)}</span>'
-            f"<div><h2>{html.escape(title)}</h2>{hint_html}</div></div>"
-        ),
-        unsafe_allow_html=True,
-    )
+def init_state(cfg: dict, user_set: dict, model_choices: list[str]) -> None:
+    state = st.session_state
+    if "api_keys" not in state:
+        state.api_keys = load_keys_from_env()
+    if "workspace_path" not in state:
+        state.workspace_path = (
+            user_set.get("workspace_path") or os.getenv("WORKSPACE_PATH") or str(DEFAULT_WS)
+        )
+    if "agent_overrides" not in state:
+        saved = user_set.get("agent_overrides") or {}
+        overrides = {}
+        for agent_id, agent_cfg in (cfg.get("agents") or {}).items():
+            overrides[agent_id] = default_override(agent_cfg, model_choices)
+            if isinstance(saved.get(agent_id), dict):
+                overrides[agent_id].update(saved[agent_id])
+            if overrides[agent_id]["model"] not in model_choices:
+                overrides[agent_id]["model"] = model_choices[0]
+        state.agent_overrides = overrides
+    pipelines = list((cfg.get("pipelines") or {}).keys()) or ["single"]
+    if state.get("pipeline") not in pipelines:
+        saved_pipe = user_set.get("pipeline") or cfg.get("default_pipeline")
+        state.pipeline = saved_pipe if saved_pipe in pipelines else pipelines[0]
+    for name, fallback in SETTING_DEFAULTS.items():
+        if name not in state:
+            saved_value = user_set.get(name)
+            state[name] = fallback if saved_value is None else type(fallback)(saved_value)
+    state.setdefault("task", "")
+    state.setdefault("job", None)
+    state.setdefault("last_run", None)
+    state.setdefault("theme", resolve_theme(user_set.get("theme")))
+    state.setdefault("palette", resolve_palette(user_set.get("palette")))
+    state.setdefault("screen", resolve_screen(user_set.get("screen")))
+    os.environ["OLLAMA_API_BASE"] = str(state.ollama_base or "").strip()
+
+
+def default_override(agent_cfg: dict, model_choices: list[str]) -> dict:
+    return {
+        "enabled": bool(agent_cfg.get("enabled", True)),
+        "model": agent_cfg.get("model", model_choices[0]),
+        "temperature": float(agent_cfg.get("temperature", 0.2)),
+    }
+
+
+def persist() -> None:
+    state = st.session_state
+    os.environ["OLLAMA_API_BASE"] = str(state.get("ollama_base") or "").strip()
+    payload = {
+        "workspace_path": state.workspace_path,
+        "pipeline": state.get("pipeline"),
+        "agent_overrides": state.get("agent_overrides", {}),
+        "theme": resolve_theme(state.get("theme")),
+        "palette": resolve_palette(state.get("palette")),
+        "screen": resolve_screen(state.get("screen")),
+    }
+    for name, fallback in SETTING_DEFAULTS.items():
+        payload[name] = state.get(name, fallback)
+    save_user_settings(payload)
+
+
+def bound(widget, label: str, name: str, save: bool = True, **kwargs):
+    """A widget whose value lives in session_state[name] and survives leaving the screen."""
+    widget_key = f"w_{name}"
+
+    def sync() -> None:
+        st.session_state[name] = st.session_state[widget_key]
+        if save:
+            persist()
+
+    return widget(label, value=st.session_state[name], key=widget_key, on_change=sync, **kwargs)
+
+
+def go(screen: str) -> None:
+    st.session_state.screen = screen
+    persist()
+
+
+def workspace_dir() -> Path:
+    raw = str(st.session_state.get("workspace_path") or "").strip()
+    return Path(raw or DEFAULT_WS).expanduser()
+
+
+# ---------- small pieces ----------
 
 
 def badge(billing: str) -> str:
     label = BILLING_BADGE.get(billing, billing or "Unknown")
     kind = billing if billing in BILLING_BADGE else "unknown"
-    return f'<span class="badge badge-{kind}">{label}</span>'
+    return f'<span class="badge badge-{kind}">{html.escape(label)}</span>'
 
 
-def init_state(cfg: dict, user_set: dict, model_choices: list[str]) -> None:
-    if "api_keys" not in st.session_state:
-        st.session_state.api_keys = load_keys_from_env()
-    if "workspace_path" not in st.session_state:
-        st.session_state.workspace_path = (
-            user_set.get("workspace_path") or os.getenv("WORKSPACE_PATH") or str(DEFAULT_WS)
-        )
-    if "agent_overrides" not in st.session_state:
-        agents_cfg = cfg.get("agents") or {}
-        overrides = {}
-        saved = user_set.get("agent_overrides") or {}
-        for agent_id, agent_cfg in agents_cfg.items():
-            overrides[agent_id] = {
-                "enabled": agent_cfg.get("enabled", True),
-                "model": agent_cfg.get("model", model_choices[0]),
-                "temperature": float(agent_cfg.get("temperature", 0.2)),
-            }
-            if agent_id in saved:
-                overrides[agent_id].update(saved[agent_id])
-        st.session_state.agent_overrides = overrides
-    pipelines = list((cfg.get("pipelines") or {}).keys()) or ["single"]
-    if "pipeline_select" not in st.session_state:
-        saved_pipe = user_set.get("pipeline") or cfg.get("default_pipeline", pipelines[0])
-        st.session_state.pipeline_select = saved_pipe if saved_pipe in pipelines else pipelines[0]
-    st.session_state.setdefault("max_steps", int(user_set.get("max_steps", 25)))
-    st.session_state.setdefault("shell_timeout", int(user_set.get("shell_timeout", 120)))
-    st.session_state.setdefault("keep_awake", bool(user_set.get("keep_awake", True)))
-    st.session_state.setdefault("keep_display", bool(user_set.get("keep_display", False)))
-    st.session_state.setdefault(
-        "ollama_base",
-        user_set.get("ollama_base") or os.getenv("OLLAMA_API_BASE") or "http://localhost:11434",
+def empty(text: str) -> None:
+    st.markdown(f'<div class="empty">{html.escape(text)}</div>', unsafe_allow_html=True)
+
+
+def status_line(kind: str, title: str, detail: str = "") -> None:
+    small = f"<small>{html.escape(detail)}</small>" if detail else ""
+    st.markdown(
+        f'<p class="status"><span class="dot {kind}"></span>{html.escape(title)} {small}</p>',
+        unsafe_allow_html=True,
     )
-    st.session_state.setdefault("last_run", None)
-    st.session_state.setdefault("theme", resolve_theme(user_set.get("theme")))
-    st.session_state.setdefault("screen", resolve_screen(user_set.get("screen")))
-    os.environ["OLLAMA_API_BASE"] = str(st.session_state.ollama_base or "").strip()
 
 
-def settings_payload() -> dict:
-    return {
-        "workspace_path": st.session_state.workspace_path,
-        "pipeline": st.session_state.get("pipeline_select"),
-        "agent_overrides": st.session_state.get("agent_overrides", {}),
-        "max_steps": int(st.session_state.get("max_steps", 25)),
-        "shell_timeout": int(st.session_state.get("shell_timeout", 120)),
-        "keep_awake": bool(st.session_state.get("keep_awake", True)),
-        "keep_display": bool(st.session_state.get("keep_display", False)),
-        "ollama_base": st.session_state.get("ollama_base") or "http://localhost:11434",
-        "theme": resolve_theme(st.session_state.get("theme")),
-        "screen": resolve_screen(st.session_state.get("screen")),
-    }
+ICONS = {
+    "file": "M7 3h7l5 5v13H7zM14 3v5h5",
+    "clock": "M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18M12 7v5l3 2",
+}
+
+EXAMPLES = [
+    "Создай hello.py, который печатает приветствие, и запусти его",
+    "Напиши README.md с описанием файлов в этой папке",
+    "Найди в коде все TODO и собери их в todo.md",
+]
 
 
-def persist() -> None:
-    os.environ["OLLAMA_API_BASE"] = str(st.session_state.get("ollama_base") or "").strip()
-    save_user_settings(settings_payload())
-
-
-def workspace_dir() -> Path:
-    raw = str(st.session_state.get("workspace_path") or "").strip()
-    return Path(raw or DEFAULT_WS)
-
-
-def render_theme_switch() -> None:
-    current = resolve_theme(st.session_state.get("theme"))
-    st.markdown('<p class="kicker">Оформление</p>', unsafe_allow_html=True)
-    dots = "".join(
-        f'<i style="background:{THEMES[theme_id]["bg"]};box-shadow:inset -8px 0 {THEMES[theme_id]["accent"]}"></i>'
-        for theme_id in THEME_ORDER
+def svg(name: str, size: int = 18) -> str:
+    return (
+        f'<svg aria-hidden="true" width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" '
+        'stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+        f'<path d="{ICONS[name]}"></path></svg>'
     )
-    st.markdown(f'<div class="palette" aria-hidden="true">{dots}</div>', unsafe_allow_html=True)
-    left, right = st.columns(2)
-    for index, theme_id in enumerate(THEME_ORDER):
-        column = left if index % 2 == 0 else right
-        with column:
-            if st.button(
-                THEMES[theme_id]["label"],
-                key=f"pick_{theme_id}",
-                type="primary" if theme_id == current else "secondary",
-                use_container_width=True,
-            ):
-                st.session_state.theme = theme_id
-                persist()
-                st.rerun()
-    st.caption(THEMES[current]["blurb"])
 
 
-def render_nav() -> None:
-    current = resolve_screen(st.session_state.get("screen"))
-    st.markdown('<p class="kicker">Разделы</p>', unsafe_allow_html=True)
-    for screen_id, label in SCREENS:
-        if st.button(
-            label,
-            key=f"nav_{screen_id}",
-            type="primary" if screen_id == current else "secondary",
-            use_container_width=True,
-        ):
-            st.session_state.screen = screen_id
-            persist()
-            st.rerun()
+def eyebrow(text: str, tag: str = "") -> None:
+    extra = f'<span class="tag quiet">{html.escape(tag)}</span>' if tag else ""
+    st.markdown(
+        f'<div class="card-head"><p class="eyebrow">{html.escape(text)}</p>{extra}</div>',
+        unsafe_allow_html=True,
+    )
+
+
+def page_head(section: str, title: str, sub: str = "", tags: tuple = ()) -> None:
+    """Page header: small section label, title, optional line and tags [(text, quiet)]."""
+    sub_html = f'<p class="sub">{html.escape(sub)}</p>' if sub else ""
+    tags_html = "".join(
+        f'<span class="tag{" quiet" if quiet else ""}">{html.escape(text)}</span>'
+        for text, quiet in tags
+    )
+    st.markdown(
+        f'<div class="page-head"><div><p class="eyebrow">{html.escape(section)}</p>'
+        f"<h1>{html.escape(title)}</h1>{sub_html}</div>"
+        f'<div class="tags">{tags_html}</div></div>',
+        unsafe_allow_html=True,
+    )
+
+
+def set_task(text: str) -> None:
+    st.session_state.task = text
+    st.session_state.pop("w_task", None)
+
+
+def recent_runs(limit: int = 4) -> list[tuple[str, str]]:
+    """(when, task) of the latest saved reports, newest first, without repeats."""
+    runs: list[tuple[str, str]] = []
+    seen: set[str] = set()
+    for path in sorted(RESULTS.glob("run_*.md"), reverse=True)[:40]:
+        try:
+            lines = path.read_text(encoding="utf-8").splitlines()[:8]
+        except OSError:
+            continue
+        task = next((ln.strip() for ln in lines[1:] if ln.strip() and not ln.startswith("#")), "")
+        if not task or task in seen:
+            continue
+        seen.add(task)
+        stamp = path.stem.removeprefix("run_")
+        try:
+            when = datetime.strptime(stamp, "%Y%m%d_%H%M%S").strftime("%d.%m %H:%M")
+        except ValueError:
+            when = stamp
+        runs.append((when, task))
+        if len(runs) >= limit:
+            break
+    return runs
+
+
+def duration(seconds: float) -> str:
+    seconds = int(seconds)
+    if seconds < 60:
+        return f"{seconds} с"
+    return f"{seconds // 60} мин {seconds % 60} с"
+
+
+# ---------- sidebar ----------
 
 
 def render_sidebar() -> None:
+    current = resolve_screen(st.session_state.get("screen"))
     with st.sidebar:
-        render_nav()
-        render_theme_switch()
-        st.header("Ключи")
-        filled = [
-            label
-            for label, env, _hint in KEY_LABELS
-            if str(st.session_state.api_keys.get(env) or "").strip()
-        ]
-        empty = [label for label, env, _hint in KEY_LABELS if label not in filled]
-        st.caption("Заданы: " + (", ".join(filled) if filled else "пока нет"))
-        st.caption("Пусто: " + (", ".join(empty) if empty else "все заполнены"))
-        with st.expander("Ввести ключи", expanded=not filled):
-            st.caption(
-                "Пароли не показываются. Пустое поле при сохранении старое значение не стирает."
-            )
-            for label, env, hint in KEY_LABELS:
-                widget_key = f"k_{env}"
-                if widget_key not in st.session_state:
-                    st.session_state[widget_key] = st.session_state.api_keys.get(env, "")
-                st.session_state.api_keys[env] = st.text_input(
-                    label,
-                    type="password",
-                    key=widget_key,
-                    help=hint,
-                )
-            if st.button("Сохранить ключи", use_container_width=True):
-                save_keys_to_env(
-                    st.session_state.api_keys,
-                    {
-                        "WORKSPACE_PATH": str(workspace_dir()),
-                        "OLLAMA_API_BASE": st.session_state.ollama_base,
-                    },
-                )
-                persist()
-                st.success("Ключи записаны в .env")
-            if st.button("Перечитать .env", type="tertiary", use_container_width=True):
-                st.session_state.api_keys = load_keys_from_env()
-                for _label, env, _hint in KEY_LABELS:
-                    st.session_state[f"k_{env}"] = st.session_state.api_keys.get(env, "")
-                st.rerun()
-
-        st.divider()
-        with st.expander("Параметры запуска", expanded=False):
-            _render_run_settings()
-
-
-def _render_run_settings() -> None:
-    st.slider(
-        "Макс. шагов агента",
-        5,
-        80,
-        key="max_steps",
-        help="Сколько вызовов модели у одной роли.",
-    )
-    st.slider("Таймаут shell, сек", 10, 300, key="shell_timeout")
-    st.checkbox(
-        "Не давать системе уснуть",
-        key="keep_awake",
-        help="Блокирует idle-сон на время задачи. Настоящий сон с замороженным процессом здесь невозможен.",
-    )
-    st.checkbox("Держать экран включённым", key="keep_display")
-    st.text_input(
-        "Адрес Ollama",
-        key="ollama_base",
-        help="Нужен только для локальных моделей. Ключ API не требуется.",
-    )
-    if st.button("Сохранить настройки", use_container_width=True):
-        persist()
-        save_keys_to_env(
-            st.session_state.api_keys,
-            {
-                "WORKSPACE_PATH": str(workspace_dir()),
-                "OLLAMA_API_BASE": st.session_state.ollama_base,
-            },
+        st.markdown(
+            '<div class="brand"><svg aria-hidden="true" width="32" height="32" viewBox="0 0 32 32" '
+            'fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" '
+            'stroke-linejoin="round"><rect x="3" y="3" width="26" height="26" rx="8"></rect>'
+            '<circle cx="11" cy="12" r="2.5"></circle><circle cx="21" cy="12" r="2.5"></circle>'
+            '<circle cx="16" cy="21" r="2.5"></circle>'
+            '<path d="M13.5 12h5M12.3 14.2l2.5 4.6M19.7 14.2l-2.5 4.6"></path></svg>'
+            "<div><b>Multi-Agent</b><small>Studio</small></div></div>",
+            unsafe_allow_html=True,
         )
-        st.success("Настройки записаны в user_settings.json")
+        for screen_id, label in SCREENS:
+            st.button(
+                label,
+                key=f"nav_{screen_id}",
+                icon=SCREEN_ICONS.get(screen_id),
+                type="primary" if screen_id == current else "secondary",
+                width="stretch",
+                on_click=go,
+                args=(screen_id,),
+            )
+        st.markdown('<p class="side-label">Тема</p>', unsafe_allow_html=True)
+
+        def set_theme() -> None:
+            st.session_state.theme = resolve_theme(st.session_state.get("w_theme"))
+            persist()
+
+        st.segmented_control(
+            "Тема",
+            THEME_ORDER,
+            default=resolve_theme(st.session_state.get("theme")),
+            format_func=lambda item: THEME_LABELS[item],
+            key="w_theme",
+            on_change=set_theme,
+            label_visibility="collapsed",
+        )
 
 
-def render_header(catalog: dict, active_steps: list[str]) -> None:
-    theme = THEMES[resolve_theme(st.session_state.get("theme"))]
-    st.markdown(
-        (
-            '<div class="mast"><div class="mark" aria-hidden="true">МС</div><div>'
-            f'<p class="kicker">{theme["kicker"]}</p>'
-            "<h1>Multi-Agent Studio</h1>"
-            '<p class="studio-lead">Сначала папка, затем задача, затем «Запустить». '
-            "Разделы и тема — в колонке слева.</p></div></div>"
-        ),
-        unsafe_allow_html=True,
-    )
-    free_count = sum(1 for meta in catalog.values() if is_free_option(meta))
-    known_keys = sum(
-        1 for env in KEY_NAMES if str(st.session_state.api_keys.get(env) or "").strip()
-    )
-    folder = workspace_dir()
-    col1, col2, col3, col4 = st.columns(4)
-    col1.metric("Моделей", len(catalog))
-    col2.metric("Бесплатных вариантов", free_count)
-    col3.metric("Ключей задано", f"{known_keys}/{len(KEY_LABELS)}")
-    col4.metric("Активных ролей", len(active_steps) or 0)
-    if folder.is_dir():
-        st.caption(f"Папка проекта: {folder}")
-    else:
-        st.warning(f"Папки проекта ещё нет: {folder}. Создайте её в разделе «Запуск».")
+# ---------- run ----------
 
 
-def active_agent_ids(cfg: dict, steps: list[str]) -> list[str]:
+def pipeline_steps(cfg: dict, pipelines: dict) -> tuple[list[str], list[str]]:
+    """All steps of the chosen pipeline and the ones that are switched on."""
+    steps = list((pipelines.get(st.session_state.pipeline) or {}).get("steps") or ["developer"])
+    overrides = st.session_state.agent_overrides
+    active = [step for step in steps if overrides.get(step, {}).get("enabled", True)]
+    return steps, active
+
+
+def render_chain(cfg: dict, active: list[str], catalog: dict, no_key: set[str]) -> None:
     agents_cfg = cfg.get("agents") or {}
-    active = []
-    for agent_id in steps:
-        override = st.session_state.agent_overrides.get(agent_id, {})
-        enabled = override.get("enabled", agents_cfg.get(agent_id, {}).get("enabled", True))
-        if enabled:
-            active.append(agent_id)
-    return active
-
-
-def render_chain(cfg: dict, steps: list[str], catalog: dict) -> None:
-    agents_cfg = cfg.get("agents") or {}
-    parts = ['<div class="chain">']
-    for index, agent_id in enumerate(steps):
-        agent_cfg = agents_cfg.get(agent_id, {})
-        override = st.session_state.agent_overrides.get(agent_id, {})
-        enabled = override.get("enabled", agent_cfg.get("enabled", True))
-        model_key = override.get("model") or agent_cfg.get("model") or ""
+    count = len(active)
+    word = "роль" if count == 1 else "роли" if 2 <= count <= 4 else "ролей"
+    eyebrow("Цепочка", f"{count} {word}")
+    items = []
+    for index, agent_id in enumerate(active, 1):
+        model_key = st.session_state.agent_overrides.get(agent_id, {}).get("model", "")
         meta = catalog.get(model_key) or {}
-        name = agent_cfg.get("name", agent_id)
-        model_name = meta.get("name") or model_key
-        billing = badge(str(meta.get("billing") or "")) if meta else ""
-        css = "chip" if enabled else "chip off"
-        state = "" if enabled else " · выкл"
-        parts.append(f'<span class="{css}">{name} · {model_name} {billing}{state}</span>')
-        if index < len(steps) - 1:
-            parts.append('<span class="arrow">→</span>')
-    parts.append("</div>")
-    st.markdown("".join(parts), unsafe_allow_html=True)
+        name = html.escape(str(agents_cfg.get(agent_id, {}).get("name", agent_id)))
+        model_name = html.escape(str(meta.get("name") or model_key))
+        missing = model_key in no_key
+        tag = '<span class="tag quiet">нет ключа</span>' if missing else ""
+        items.append(
+            f'<li class="{"nokey" if missing else ""}"><span class="num">{index}</span>'
+            f'<span class="who"><b>{name}</b><small>{model_name}</small></span>{tag}</li>'
+        )
+    if items:
+        st.markdown(f'<ol class="steps">{"".join(items)}</ol>', unsafe_allow_html=True)
+    else:
+        empty("Все роли выключены.")
+
+
+def render_folder_picker() -> None:
+    folder = workspace_dir()
+    with st.popover(
+        f"Папка: {folder.name or folder}", icon=":material/folder_open:", width="stretch"
+    ):
+        st.caption("Агенты читают и пишут файлы только в этой папке.")
+
+        def set_path() -> None:
+            st.session_state.workspace_path = st.session_state.w_workspace_path.strip()
+            persist()
+
+        st.text_input(
+            "Путь",
+            value=st.session_state.workspace_path,
+            key="w_workspace_path",
+            on_change=set_path,
+        )
+
+        def choose(path: Path) -> None:
+            st.session_state.workspace_path = str(path)
+            st.session_state.pop("w_workspace_path", None)
+            persist()
+
+        presets = preset_paths(DEFAULT_WS)
+        for column, (label, path) in zip(st.columns(len(presets)), presets):
+            column.button(label, key=f"ws_{label}", on_click=choose, args=(path,), width="stretch")
+        if not folder.is_dir():
+            st.caption("Такой папки ещё нет — она будет создана при запуске.")
 
 
 def render_run(cfg: dict, catalog: dict, pipelines: dict) -> None:
-    step("1", "Папка", "Агенты работают только внутри неё. Перед перезаписью делается backup.")
-    presets = preset_paths(DEFAULT_WS)
-    columns = st.columns(min(4, max(len(presets), 1)))
-    for index, (label, path) in enumerate(presets):
-        with columns[index % len(columns)]:
-            if st.button(label, key=f"ws_{index}", use_container_width=True):
-                st.session_state.workspace_path = str(path)
+    job: RunJob | None = st.session_state.job
+    busy = bool(job and job.running)
+    free = sum(1 for meta in catalog.values() if is_free_option(meta))
+    page_head(
+        "Запуск",
+        "Что сделать?",
+        tags=((f"{len(catalog)} моделей в каталоге", True), (f"{free} бесплатных", False)),
+    )
+    _steps, active = pipeline_steps(cfg, pipelines)
+    model_keys = [st.session_state.agent_overrides[a]["model"] for a in active]
+    missing = missing_credentials(model_keys, st.session_state.api_keys, catalog, cfg)
+    no_key = {model_key for model_key, _provider, _env in missing}
+    names = list(pipelines)
+
+    left, right = st.columns([2, 1], gap="medium")
+    with left, st.container(key="card_task"):
+        eyebrow("Задача")
+        bound(
+            st.text_area,
+            "Задача",
+            "task",
+            save=False,
+            height=120,
+            placeholder="Опишите, что нужно сделать. Одного предложения достаточно.",
+            label_visibility="collapsed",
+            disabled=busy,
+        )
+        if not str(st.session_state.task).strip() and not busy:
+            for column, (index, text) in zip(st.columns(len(EXAMPLES)), enumerate(EXAMPLES)):
+                column.button(
+                    text,
+                    key=f"ex_{index}",
+                    on_click=set_task,
+                    args=(text,),
+                    width="stretch",
+                    help="Подставить пример: " + text,
+                )
+        mode_col, folder_col = st.columns([3, 2], vertical_alignment="bottom")
+        with mode_col:
+
+            def set_pipeline() -> None:
+                st.session_state.pipeline = st.session_state.w_pipeline
                 persist()
-                st.rerun()
-    st.text_input("Путь к папке", key="workspace_path")
+
+            st.selectbox(
+                "Режим",
+                names,
+                index=names.index(st.session_state.pipeline),
+                format_func=lambda name: PIPELINE_LABELS.get(name, name),
+                key="w_pipeline",
+                on_change=set_pipeline,
+                disabled=busy,
+                label_visibility="collapsed",
+            )
+        with folder_col:
+            render_folder_picker()
+
+        blocked = ""
+        if not active:
+            blocked = "В этом режиме выключены все роли."
+            st.warning(blocked + " Включите хотя бы одну в разделе «Агенты».")
+        elif missing:
+            envs = ", ".join(dict.fromkeys(env for _m, _p, env in missing))
+            if len(no_key) == len(set(model_keys)):
+                blocked = "Нет ключа ни для одной модели."
+                text = f"Чтобы запустить, нужен ключ: {envs}. У Google AI Studio он бесплатный."
+            else:
+                text = f"Нет ключа {envs} — роли с пунктиром будут пропущены."
+            note, action = st.columns([3, 1], vertical_alignment="center")
+            note.warning(text)
+            action.button("Добавить ключ", on_click=go, args=("settings",), width="stretch")
+
+        if st.button(
+            "Запустить",
+            icon=":material/play_arrow:",
+            type="primary",
+            width="stretch",
+            key="launch_run",
+            disabled=busy or bool(blocked),
+        ):
+            start_run(cfg)
+            st.rerun()
+
+    with right, st.container(key="card_chain"):
+        render_chain(cfg, active, catalog, no_key)
+        st.button(
+            "Настроить роли",
+            icon=":material/tune:",
+            on_click=go,
+            args=("agents",),
+            type="tertiary",
+        )
+
+    left, right = st.columns([2, 1], gap="medium")
+    with left:
+        if st.session_state.job is not None:
+            render_progress()
+        elif st.session_state.last_run:
+            render_result()
+        else:
+            with st.container(key="card_idle"):
+                eyebrow("Ход работы")
+                empty("Здесь появятся журнал и результат запуска.")
+        if not busy:
+            render_history()
+    with right:
+        render_files_card()
+        render_keys_card()
+
+
+def render_history() -> None:
+    runs = recent_runs()
+    if not runs:
+        return
+    with st.container(key="card_history"):
+        eyebrow("Недавние задачи", "нажмите, чтобы повторить")
+        for index, (when, task) in enumerate(runs):
+            st.button(
+                f"{when} · {task}",
+                key=f"hist_{index}",
+                icon=":material/history:",
+                on_click=set_task,
+                args=(task,),
+                width="stretch",
+                help=task,
+            )
+
+
+def render_files_card() -> None:
     folder = workspace_dir()
-    action_col, _rest = st.columns([1, 3])
-    with action_col:
-        if st.button("Создать папку", use_container_width=True):
-            try:
-                folder.mkdir(parents=True, exist_ok=True)
-                st.success(f"Папка готова: {folder}")
-            except OSError as exc:
-                st.error(f"Не удалось создать папку: {exc}")
-    if folder.is_dir():
-        st.caption(f"Папка на месте: {folder}")
-    else:
-        st.warning("Такой папки нет. Создайте её или выберите другой путь.")
-
-    step("2", "Пайплайн", "Включённые роли идут слева направо.")
-    pipe_names = list(pipelines.keys())
-    if st.session_state.pipeline_select not in pipe_names:
-        st.session_state.pipeline_select = pipe_names[0]
-    pipeline_name = st.selectbox(
-        "Режим",
-        pipe_names,
-        format_func=lambda name: f"{name} — {pipelines[name].get('description', '')}",
-        key="pipeline_select",
-    )
-    steps = list(pipelines.get(pipeline_name, {}).get("steps") or ["developer"])
-    render_chain(cfg, steps, catalog)
-    active = active_agent_ids(cfg, steps)
-    if not active:
-        st.error(
-            "В этом пайплайне нет включённых ролей. Откройте раздел «Агенты» слева и включите хотя бы одну."
-        )
-    else:
-        missing = missing_credentials(
-            model_keys_for(cfg, active), st.session_state.api_keys, catalog, cfg
-        )
-        if missing:
-            bits = [f"{env} ({provider})" for _model, provider, env in missing]
-            st.warning(
-                "Нет ключа для: "
-                + ", ".join(dict.fromkeys(bits))
-                + ". Такой шаг будет пропущен. Локальный Ollama ключ не требует."
+    with st.container(key="card_files"):
+        try:
+            files = list_files(folder) if folder.is_dir() else []
+        except OSError:
+            files = []
+        eyebrow("Файлы", f"{folder.name}/")
+        if files:
+            rows = "".join(
+                f'<div class="row">{svg("file")}<span class="name">{html.escape(name)}</span></div>'
+                for name in files[:5]
             )
-
-    step("3", "Задача", "Одно предложение достаточно. Итог останется ниже.")
-    task = st.text_area(
-        "Задача",
-        height=150,
-        placeholder="Например: создай hello.py, который печатает приветствие, и запусти его.",
-        key="task_text",
-    )
-    run_clicked = st.button("Запустить", type="primary", use_container_width=True, key="launch_run")
-    if run_clicked:
-        execute_run(cfg, catalog, pipeline_name, task, active)
-
-    last = st.session_state.last_run
-    if not last:
-        slip(
-            "Следующий шаг",
-            "Опишите задачу выше и нажмите «Запустить». Итог останется на этой странице.",
-        )
-        return
-    with st.container(key="result_panel"):
-        st.markdown('<p class="kicker">Результат</p>', unsafe_allow_html=True)
-        st.caption(last.get("when") or "")
-        if last.get("logs"):
-            with st.expander("Журнал", expanded=bool(last.get("error"))):
-                st.code("\n".join(last["logs"][-80:]), language="text")
-        if last.get("error"):
-            st.error(last["error"])
-            if last.get("traceback"):
-                with st.expander("Техническая подробность"):
-                    st.code(last["traceback"], language="text")
-        elif last.get("result"):
-            st.markdown(last["result"])
-            st.download_button(
-                "Скачать отчёт",
-                data=last.get("report") or last["result"],
-                file_name=last.get("file_name") or "run.md",
-                mime="text/markdown",
+            st.markdown(f'<div class="rows">{rows}</div>', unsafe_allow_html=True)
+            if len(files) > 5:
+                st.caption(f"и ещё {len(files) - 5}")
+            st.button(
+                "Открыть файлы",
+                icon=":material/folder_open:",
+                on_click=go,
+                args=("files",),
+                type="tertiary",
             )
+        else:
+            st.caption("Пока пусто. Перед каждой перезаписью сохраняется копия в backups/.")
 
 
-def model_keys_for(cfg: dict, agent_ids: list[str]) -> list[str]:
-    agents_cfg = cfg.get("agents") or {}
-    keys = []
-    for agent_id in agent_ids:
-        override = st.session_state.agent_overrides.get(agent_id, {})
-        keys.append(override.get("model") or agents_cfg.get(agent_id, {}).get("model") or "")
-    return [key for key in keys if key]
+def render_keys_card() -> None:
+    keys = st.session_state.api_keys
+    filled = [label for label, env, _hint in KEY_LABELS if str(keys.get(env) or "").strip()]
+    shown = filled or [label for label, _env, _hint in KEY_LABELS[:2]]
+    with st.container(key="card_keys"):
+        eyebrow("Ключи API", f"{len(filled)} из {len(KEY_LABELS)}")
+        rows = []
+        for label in shown:
+            ok = label in filled
+            rows.append(
+                f'<div class="row"><span class="dot {"ok" if ok else ""}"></span>'
+                f'<span class="label">{html.escape(label)}</span>'
+                f'<span class="state {"ok" if ok else ""}">{"задан" if ok else "не задан"}</span></div>'
+            )
+        st.markdown(f'<div class="rows">{"".join(rows)}</div>', unsafe_allow_html=True)
+        st.button(
+            "Управлять ключами",
+            icon=":material/key:",
+            on_click=go,
+            args=("settings",),
+            type="tertiary",
+        )
 
 
-def execute_run(cfg: dict, catalog: dict, pipeline_name: str, task: str, active: list[str]) -> None:
-    persist()
-    if not task.strip():
-        st.error("Введите задачу. Пустой запрос запускать некуда.")
-        return
-    if not active:
-        st.error("Включите хотя бы одну роль в этом пайплайне.")
+def start_run(cfg: dict) -> None:
+    task = str(st.session_state.task or "").strip()
+    if not task:
+        st.session_state.last_run = {"outcome": "failed", "error": "Опишите задачу — поле пустое."}
         return
     folder = workspace_dir()
     try:
         folder.mkdir(parents=True, exist_ok=True)
     except OSError as exc:
-        st.error(f"Папка проекта недоступна: {exc}")
+        st.session_state.last_run = {"outcome": "failed", "error": f"Папка недоступна: {exc}"}
         return
-    st.session_state.workspace_path = str(folder)
-    save_keys_to_env(
-        st.session_state.api_keys,
-        {"WORKSPACE_PATH": str(folder), "OLLAMA_API_BASE": st.session_state.ollama_base},
-    )
-    logs: list[str] = []
-    log_box = st.empty()
-
-    def log_fn(message: str) -> None:
-        logs.append(str(message))
-        log_box.code("\n".join(logs[-60:]), language="text")
-
-    orchestrator = Orchestrator(
+    persist()
+    st.session_state.last_run = None
+    st.session_state.job = RunJob(
+        task=task,
+        results_dir=RESULTS,
+        keep_awake=bool(st.session_state.keep_awake),
+        keep_display=bool(st.session_state.keep_display),
         workspace=str(folder),
         backup_dir=str(BACKUPS),
-        api_keys=st.session_state.api_keys,
+        api_keys=dict(st.session_state.api_keys),
         config=cfg,
         max_steps=int(st.session_state.max_steps),
         shell_timeout=int(st.session_state.shell_timeout),
-        log_fn=log_fn,
-        overrides=st.session_state.agent_overrides,
-        pipeline_name=pipeline_name,
-    )
-    power_runtime = None
-    if st.session_state.keep_awake:
-        power_runtime = AgentRuntime(
-            workspace=str(folder),
-            backup_dir=str(BACKUPS),
-            model="ollama_chat/gemma4",
-            api_key="ollama",
-            allowed_tools=[],
-            role_name="power",
-        )
-        log_fn(power_runtime.power.start("display" if st.session_state.keep_display else "system"))
-    try:
-        with st.spinner("Агенты работают…"):
-            result = orchestrator.run(task.strip())
-        stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        report = (
-            f"# Задача\n\n{task.strip()}\n\n# Журнал\n\n"
-            + "\n".join(logs)
-            + f"\n\n# Результат\n\n{result}"
-        )
-        out = RESULTS / f"run_{stamp}.md"
-        out.write_text(report, encoding="utf-8")
-        st.session_state.last_run = {
-            "when": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            "logs": logs,
-            "result": result,
-            "report": report,
-            "file_name": out.name,
-            "error": "",
-        }
-    except Exception as exc:
-        st.session_state.last_run = {
-            "when": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            "logs": logs,
-            "result": "",
-            "error": f"Запуск остановился: {exc}",
-            "traceback": traceback.format_exc(),
-        }
-    finally:
-        if power_runtime is not None:
-            log_fn(power_runtime.power.stop())
-            if st.session_state.last_run is not None:
-                st.session_state.last_run["logs"] = logs
+        overrides={k: dict(v) for k, v in st.session_state.agent_overrides.items()},
+        pipeline_name=st.session_state.pipeline,
+    ).start()
+
+
+def render_progress() -> None:
+    job: RunJob | None = st.session_state.job
+    if job is None:
+        return
+
+    @st.fragment(run_every=1.0)
+    def live() -> None:
+        current: RunJob | None = st.session_state.job
+        if current is None:
+            return
+        if not current.running:
+            finish_run(current)
+            st.rerun()
+        index, total, name = current.step
+        elapsed = duration((datetime.now() - current.started).total_seconds())
+        with st.container(key="live_panel"):
+            head, action = st.columns([4, 1], vertical_alignment="center")
+            with head:
+                if current.stopping:
+                    status_line("live", "Останавливаю…", "дождусь конца текущего шага")
+                elif total:
+                    status_line("live", f"{name} работает", f"шаг {index} из {total} · {elapsed}")
+                else:
+                    status_line("live", "Запускаю…", elapsed)
+            action.button(
+                "Остановить",
+                key="stop_run",
+                on_click=current.stop,
+                disabled=current.stopping,
+                width="stretch",
+            )
+            st.code("\n".join(current.logs[-14:]) or "…", language="text")
+
+    live()
+
+
+def result_body(result: str) -> str:
+    """The report without its two technical header lines; the saved file keeps them."""
+    lines = result.splitlines()
+    while lines and (lines[0].startswith("# ") or not lines[0].strip()):
+        lines.pop(0)
+    return "\n".join(lines)
+
+
+def finish_run(job: RunJob) -> None:
+    seconds = ((job.finished or job.started) - job.started).total_seconds()
+    st.session_state.last_run = {
+        "outcome": job.outcome,
+        "when": f"{job.started:%H:%M}",
+        "took": duration(seconds),
+        "logs": list(job.logs),
+        "result": result_body(job.result),
+        "report": job.report(),
+        "error": job.error,
+        "traceback": job.traceback,
+        "file_name": job.report_path.name if job.report_path else "run.md",
+    }
+    st.session_state.job = None
+
+
+def render_result() -> None:
+    last = st.session_state.last_run
+    if not last or st.session_state.job is not None:
+        return
+    outcome = last.get("outcome")
+    with st.container(key="result_panel"):
+        detail = " · ".join(bit for bit in (last.get("when"), last.get("took")) if bit)
+        if outcome == "ok":
+            status_line("ok", "Готово", detail)
+        elif outcome == "stopped":
+            status_line("", "Остановлено", detail)
+        else:
+            status_line("bad", "Не получилось", detail)
+        if last.get("error"):
+            st.error(last["error"])
+        if last.get("result"):
+            st.markdown(last["result"])
+        if last.get("traceback"):
+            with st.expander("Техническая подробность"):
+                st.code(last["traceback"], language="text")
+        if last.get("logs"):
+            with st.expander("Журнал"):
+                st.code("\n".join(last["logs"][-200:]), language="text")
+        if last.get("report"):
+            left, right, _rest = st.columns([1, 1, 2])
+            left.download_button(
+                "Скачать отчёт",
+                data=last["report"],
+                file_name=last.get("file_name") or "run.md",
+                mime="text/markdown",
+                width="stretch",
+            )
+            right.button("Открыть файлы", on_click=go, args=("files",), width="stretch")
+
+
+# ---------- agents ----------
 
 
 def render_agents(cfg: dict, catalog: dict, model_choices: list[str]) -> None:
-    st.caption(
-        "Бейдж Free tier значит, что у провайдера есть бесплатная квота, а цифра рядом — платный тариф за её пределами. "
-        "Настройки пишутся в user_settings.json."
-    )
+    page_head("Агенты", "Роли и модели", "У каждой роли своя модель. Изменения сохраняются сразу.")
     agents_cfg = cfg.get("agents") or {}
-    recommendations = cfg.get("recommendations") or {}
     if not agents_cfg:
-        st.info("В config/agents.yaml нет ролей.")
+        empty("В config/agents.yaml нет ролей.")
         return
-    for agent_id, agent_cfg in agents_cfg.items():
-        current = st.session_state.agent_overrides.get(agent_id, {})
-        with st.expander(
-            f"{agent_cfg.get('name', agent_id)} · {agent_id}", expanded=(agent_id == "developer")
-        ):
-            st.caption(agent_cfg.get("description", ""))
-            col_on, col_model, col_temp = st.columns([1, 4, 2])
-            with col_on:
-                flag = f"en_{agent_id}"
-                if flag not in st.session_state:
-                    st.session_state[flag] = bool(
-                        current.get("enabled", agent_cfg.get("enabled", True))
-                    )
-                enabled = st.checkbox("Включена", key=flag)
-            with col_model:
-                model_flag = f"model_{agent_id}"
-                preferred = current.get("model") or agent_cfg.get("model") or model_choices[0]
-                if (
-                    model_flag not in st.session_state
-                    or st.session_state[model_flag] not in model_choices
-                ):
-                    st.session_state[model_flag] = (
-                        preferred if preferred in model_choices else model_choices[0]
-                    )
-                model_key = st.selectbox(
+    recommendations = cfg.get("recommendations") or {}
+    overrides = st.session_state.agent_overrides
+
+    def update(agent_id: str, field: str, widget_key: str) -> None:
+        overrides[agent_id][field] = st.session_state[widget_key]
+        persist()
+
+    agent_ids = list(agents_cfg)
+    for start in range(0, len(agent_ids), 3):
+        for column, agent_id in zip(st.columns(3, gap="medium"), agent_ids[start : start + 3]):
+            agent_cfg = agents_cfg[agent_id]
+            current = overrides[agent_id]
+            with column, st.container(key=f"card_{agent_id}"):
+                key = f"w_on_{agent_id}"
+                st.toggle(
+                    str(agent_cfg.get("name", agent_id)),
+                    value=bool(current["enabled"]),
+                    key=key,
+                    on_change=update,
+                    args=(agent_id, "enabled", key),
+                )
+                st.caption(agent_cfg.get("description", ""))
+                key = f"w_model_{agent_id}"
+                suggested = [
+                    str((catalog.get(item) or {}).get("name") or item)
+                    for item in recommendations.get(agent_id) or []
+                    if item in catalog
+                ]
+                st.selectbox(
                     "Модель",
                     model_choices,
-                    key=model_flag,
-                    format_func=lambda key: model_label(key, catalog),
+                    index=model_choices.index(current["model"]),
+                    format_func=lambda item: str((catalog.get(item) or {}).get("name") or item),
+                    key=key,
+                    on_change=update,
+                    args=(agent_id, "model", key),
+                    label_visibility="collapsed",
+                    help=("Подходят: " + ", ".join(suggested)) if suggested else None,
                 )
-            with col_temp:
-                temp_flag = f"temp_{agent_id}"
-                if temp_flag not in st.session_state:
-                    st.session_state[temp_flag] = float(
-                        current.get("temperature", agent_cfg.get("temperature", 0.2))
+                meta = catalog.get(current["model"]) or {}
+                if meta:
+                    st.markdown(
+                        badge(str(meta.get("billing") or ""))
+                        + f'<span class="tag quiet">{html.escape(format_price(meta))}</span>',
+                        unsafe_allow_html=True,
                     )
-                temperature = st.slider("Температура", 0.0, 1.0, step=0.05, key=temp_flag)
-            meta = catalog.get(model_key) or {}
-            if meta:
-                st.markdown(
-                    badge(str(meta.get("billing") or "")) + " " + format_price(meta),
-                    unsafe_allow_html=True,
+                key = f"w_temp_{agent_id}"
+                st.slider(
+                    "Температура",
+                    0.0,
+                    1.0,
+                    value=float(current["temperature"]),
+                    step=0.05,
+                    key=key,
+                    on_change=update,
+                    args=(agent_id, "temperature", key),
+                    help="Ниже — строже и предсказуемее, выше — свободнее.",
                 )
-                if meta.get("availability") == "deprecated":
-                    st.warning(meta.get("summary") or "Модель помечена как deprecated.")
-                elif meta.get("price_status") == "unknown":
-                    st.caption(
-                        "Цена: unknown. Цифру не ставили, потому что официальный источник её не подтвердил."
-                    )
-                else:
-                    st.caption(meta.get("price_note") or "")
-            suggested = recommendations.get(agent_id) or []
-            if suggested:
-                st.caption(
-                    "С чего начать: "
-                    + ", ".join(model_label(item, catalog) for item in suggested if item in catalog)
-                )
-            st.session_state.agent_overrides[agent_id] = {
-                "enabled": enabled,
-                "model": model_key,
-                "temperature": float(temperature),
-            }
-    col_save, col_reset = st.columns(2)
-    with col_save:
-        if st.button("Сохранить роли", use_container_width=True):
-            persist()
-            st.success("Роли сохранены.")
-    with col_reset:
-        if st.button("Вернуть модели из agents.yaml", type="tertiary", use_container_width=True):
-            for agent_id, agent_cfg in agents_cfg.items():
-                st.session_state.agent_overrides[agent_id] = {
-                    "enabled": agent_cfg.get("enabled", True),
-                    "model": agent_cfg.get("model", model_choices[0]),
-                    "temperature": float(agent_cfg.get("temperature", 0.2)),
-                }
-                st.session_state[f"en_{agent_id}"] = bool(agent_cfg.get("enabled", True))
-                chosen = agent_cfg.get("model", model_choices[0])
-                st.session_state[f"model_{agent_id}"] = (
-                    chosen if chosen in model_choices else model_choices[0]
-                )
-                st.session_state[f"temp_{agent_id}"] = float(agent_cfg.get("temperature", 0.2))
-            persist()
-            st.rerun()
+
+    def reset() -> None:
+        for agent_id, agent_cfg in agents_cfg.items():
+            overrides[agent_id] = default_override(agent_cfg, model_choices)
+            if overrides[agent_id]["model"] not in model_choices:
+                overrides[agent_id]["model"] = model_choices[0]
+            for prefix in ("w_on_", "w_model_", "w_temp_"):
+                st.session_state.pop(prefix + agent_id, None)
+        persist()
+
+    st.button("Вернуть как было", icon=":material/restart_alt:", type="tertiary", on_click=reset)
+
+
+# ---------- models ----------
 
 
 def passes_billing(meta: dict, mode: str) -> bool:
-    billing = meta.get("billing")
-    if mode == "all":
-        return True
     if mode == "free":
         return is_free_option(meta)
     if mode == "paid":
-        return billing == "paid"
+        return meta.get("billing") == "paid"
     if mode == "local":
-        return billing == "local"
-    if mode == "unknown":
-        return meta.get("price_status") == "unknown"
+        return meta.get("billing") == "local"
     return True
 
 
 def render_models(catalog: dict) -> None:
+    page_head("Модели", "Каталог и цены")
+    verified = max((str(m.get("last_verified") or "") for m in catalog.values()), default="")
     st.markdown(
-        "Цены сверены **9 ноября 2026** по страницам провайдеров и ответу API OpenRouter. "
-        "Если цифры не было в источнике, стоит **unknown** — её не придумывали. "
-        "Free tier у Gemini — это $0 в лимитах, а колонка цены показывает платный тариф после лимита."
+        f'<p class="lead">Цены в долларах за 1M токенов, вход / выход. Сверено {html.escape(verified)}. '
+        "У Free tier показан платный тариф после бесплатной квоты.</p>",
+        unsafe_allow_html=True,
     )
-    providers = sorted({str(meta.get("provider") or "") for meta in catalog.values()})
-    search_col, provider_col = st.columns(2)
-    with search_col:
-        search = st.text_input("Поиск", placeholder="Имя, провайдер или ID", key="model_search")
-    with provider_col:
-        if "provider_filter" not in st.session_state:
-            st.session_state.provider_filter = providers
-        else:
-            st.session_state.provider_filter = [
-                item for item in st.session_state.provider_filter if item in providers
-            ] or providers
-        chosen_providers = st.multiselect("Провайдеры", providers, key="provider_filter")
-    billing_label = st.radio(
-        "Доступ",
-        [label for label, _mode in BILLING_FILTERS],
-        horizontal=True,
-        key="billing_filter",
+    left, right = st.columns([2, 3], vertical_alignment="bottom")
+    query = left.text_input(
+        "Поиск", placeholder="Название, провайдер или ID", label_visibility="collapsed"
     )
-    mode = dict(BILLING_FILTERS)[billing_label]
-    query = search.strip().lower()
-    rows = []
-    matched: list[tuple[str, dict]] = []
+    choice = right.pills(
+        "Доступ", list(BILLING_FILTERS), default="Все", label_visibility="collapsed"
+    )
+    mode = BILLING_FILTERS.get(choice or "Все", "all")
+    needle = query.strip().lower()
+    matched = []
     for model_key, meta in catalog.items():
         if not passes_billing(meta, mode):
             continue
-        if meta.get("provider") not in chosen_providers:
-            continue
         haystack = " ".join(
-            [
-                model_key,
-                str(meta.get("name") or ""),
-                str(meta.get("provider") or ""),
-                str(meta.get("litellm") or ""),
-                str(meta.get("summary") or ""),
-            ]
-        ).lower()
-        if query and query not in haystack:
+            str(meta.get(field) or "") for field in ("name", "provider", "litellm", "summary")
+        )
+        if needle and needle not in (model_key + " " + haystack).lower():
             continue
         matched.append((model_key, meta))
-        rows.append(
-            {
-                "Модель": meta.get("name"),
-                "Провайдер": meta.get("provider"),
-                "Доступ": BILLING_BADGE.get(meta.get("billing"), meta.get("billing")),
-                "Цена, USD / 1M in → out": format_price(meta),
-                "Контекст": meta.get("context"),
-                "Статус": meta.get("availability"),
-                "Проверено": meta.get("last_verified"),
-            }
-        )
-    st.caption(f"Показано {len(rows)} из {len(catalog)}.")
-    if not rows:
-        slip("Пусто по фильтру", "Сбросьте поиск или верните доступ на «Все».")
+    if not matched:
+        empty("Ничего не нашлось. Измените запрос или верните фильтр на «Все».")
         return
-    render_sheet(rows)
-    labels = {model_key: model_label(model_key, catalog) for model_key, _meta in matched}
-    selected = st.selectbox("Карточка модели", list(labels), format_func=lambda key: labels[key])
-    meta = catalog[selected]
-    st.markdown('<div class="detail-card">', unsafe_allow_html=True)
+    rows = []
+    for _key, meta in matched:
+        rows.append(
+            "<tr>"
+            f"<td>{html.escape(str(meta.get('name')))}<br><small>{html.escape(str(meta.get('litellm')))}</small></td>"
+            f"<td>{html.escape(str(meta.get('provider')))}</td>"
+            f"<td>{badge(str(meta.get('billing') or ''))}</td>"
+            f'<td class="num">{html.escape(format_price(meta).replace(" за 1M", ""))}</td>'
+            f'<td class="num">{html.escape(str(meta.get("context")))}</td>'
+            "</tr>"
+        )
     st.markdown(
-        badge(str(meta.get("billing") or "")) + f" **{meta.get('name')}** · {meta.get('provider')}",
+        '<div class="sheet-wrap"><table class="sheet"><thead><tr>'
+        "<th>Модель</th><th>Провайдер</th><th>Доступ</th><th>Цена</th><th>Контекст</th>"
+        f"</tr></thead><tbody>{''.join(rows)}</tbody></table></div>",
         unsafe_allow_html=True,
     )
-    st.markdown(meta.get("summary") or "")
-    st.markdown(
-        f"- **ID:** `{meta.get('litellm')}`\n"
-        f"- **Цена:** {format_price(meta)}\n"
-        f"- **Пояснение:** {meta.get('price_note')}\n"
-        f"- **Контекст:** {meta.get('context')}\n"
-        f"- **Для каких задач:** {meta.get('best_for')}\n"
-        f"- **Статус:** {meta.get('availability')}\n"
-        f"- **Источник:** {meta.get('source')}\n"
-        f"- **Проверено:** {meta.get('last_verified')}"
-    )
-    st.markdown("</div>", unsafe_allow_html=True)
+    st.caption(f"Показано {len(matched)} из {len(catalog)}.")
+    with st.expander("Подробности о модели"):
+        labels = {model_key: str(meta.get("name")) for model_key, meta in matched}
+        selected = st.selectbox(
+            "Модель", list(labels), format_func=labels.get, label_visibility="collapsed"
+        )
+        meta = catalog[selected]
+        st.markdown(
+            badge(str(meta.get("billing") or ""))
+            + f" **{html.escape(str(meta.get('name')))}** · {html.escape(str(meta.get('provider')))}",
+            unsafe_allow_html=True,
+        )
+        st.markdown(meta.get("summary") or "")
+        st.markdown(
+            f"- **ID:** `{meta.get('litellm')}`\n"
+            f"- **Цена:** {format_price(meta)}. {meta.get('price_note')}\n"
+            f"- **Контекст:** {meta.get('context')}\n"
+            f"- **Для чего:** {meta.get('best_for')}\n"
+            f"- **Источник:** {meta.get('source')} · проверено {meta.get('last_verified')}"
+        )
 
 
-def render_sheet(rows: list[dict]) -> None:
-    columns = list(rows[0].keys())
-    head = "".join(f"<th>{html.escape(str(column))}</th>" for column in columns)
-    body = []
-    for row in rows:
-        cells = "".join(f"<td>{html.escape(str(row.get(column, '')))}</td>" for column in columns)
-        body.append(f"<tr>{cells}</tr>")
-    st.markdown(
-        (
-            '<div class="sheet-wrap"><table class="sheet"><thead><tr>'
-            f"{head}</tr></thead><tbody>{''.join(body)}</tbody></table></div>"
-        ),
-        unsafe_allow_html=True,
-    )
+# ---------- files ----------
+
+
+def list_files(folder: Path) -> list[str]:
+    found: list[str] = []
+    for current, dirs, files in os.walk(folder):
+        dirs[:] = sorted(d for d in dirs if d not in SKIP_DIRS)
+        for name in sorted(files):
+            found.append(str((Path(current) / name).relative_to(folder)))
+            if len(found) >= FILE_LIMIT:
+                return found
+    return found
 
 
 def render_files() -> None:
+    page_head("Файлы", "Папка проекта")
     folder = workspace_dir()
-    st.caption(f"Корень: {folder}")
+    st.markdown(f'<p class="lead">{html.escape(str(folder))}</p>', unsafe_allow_html=True)
     if not folder.is_dir():
-        st.warning("Папка проекта не найдена. Создайте её в разделе «Запуск».")
+        empty("Папки ещё нет. Она появится после первого запуска.")
         return
     try:
-        from tools.filesystem import WorkspaceFS
-
-        filesystem = WorkspaceFS(folder, BACKUPS)
-        entries = sorted(folder.iterdir(), key=lambda item: (not item.is_dir(), item.name.lower()))
-    except Exception as exc:
+        files = list_files(folder)
+    except OSError as exc:
         st.error(f"Не удалось прочитать папку: {exc}")
         return
-    st.caption("Содержимое папки")
-    st.code(filesystem.list_dir("."), language="text")
-    if not entries:
-        slip(
-            "Папка пустая",
-            "Запустите агента с задачей «создай файл» или положите файлы в эту папку сами.",
+    if not files:
+        empty("Папка пустая. Файлы появятся здесь, когда агенты их создадут.")
+        return
+    chosen = st.selectbox("Файл", files, label_visibility="collapsed")
+    if len(files) >= FILE_LIMIT:
+        st.caption(f"Показаны первые {FILE_LIMIT} файлов.")
+    from tools.filesystem import WorkspaceFS
+
+    try:
+        text = WorkspaceFS(folder, BACKUPS).read_file(chosen)
+    except (OSError, PermissionError) as exc:
+        st.error(str(exc))
+        return
+    suffix = Path(chosen).suffix.lower().lstrip(".")
+    language = {"py": "python", "js": "javascript", "ts": "typescript", "md": "markdown"}.get(
+        suffix, suffix if suffix in {"json", "yaml", "toml", "html", "css", "sql"} else "text"
+    )
+    st.code(text, language=language)
+
+
+# ---------- settings ----------
+
+
+def render_settings() -> None:
+    page_head("Настройки", "Ключи и параметры")
+
+    st.subheader("Оформление")
+
+    def set_palette() -> None:
+        st.session_state.palette = resolve_palette(st.session_state.get("w_palette"))
+        persist()
+
+    st.segmented_control(
+        "Палитра",
+        PALETTE_ORDER,
+        default=resolve_palette(st.session_state.palette),
+        format_func=lambda item: PALETTE_LABELS[item],
+        key="w_palette",
+        on_change=set_palette,
+        help="«Графит» — тёмно-серые тона с ярким акцентом, «Тёплая» — исходные цвета студии.",
+    )
+
+    st.subheader("Ключи API")
+    st.caption(
+        "Хватит одного. Ключи лежат в файле .env рядом с программой и никуда не отправляются, "
+        "кроме самого провайдера."
+    )
+    keys = st.session_state.api_keys
+    with st.form("keys_form", border=False):
+        columns = st.columns(2)
+        entered = {}
+        for index, (label, env, hint) in enumerate(KEY_LABELS):
+            entered[env] = columns[index % 2].text_input(
+                label, value=keys.get(env, ""), type="password", placeholder=hint
+            )
+        if st.form_submit_button("Сохранить ключи", type="primary"):
+            st.session_state.api_keys = {env: value.strip() for env, value in entered.items()}
+            save_keys_to_env(st.session_state.api_keys)
+            st.toast("Ключи сохранены")
+            st.rerun()
+
+    st.subheader("Запуск")
+    left, right = st.columns(2)
+    with left:
+        bound(
+            st.slider,
+            "Шагов на одну роль",
+            "max_steps",
+            min_value=5,
+            max_value=80,
+            help="Сколько раз роль может обратиться к модели за один запуск.",
         )
-    else:
-        files = [item.name for item in entries if item.is_file()]
-        if files:
-            chosen = st.selectbox("Файл", files)
-            if st.button("Прочитать файл"):
-                show_file(filesystem, chosen)
-        else:
-            st.caption("Файлов для чтения нет, только папки.")
-    custom = st.text_input("Или путь внутри папки", placeholder="src/main.py")
-    if custom and st.button("Прочитать путь"):
-        show_file(filesystem, custom.strip())
+        bound(st.toggle, "Не давать компьютеру уснуть", "keep_awake")
+    with right:
+        bound(
+            st.slider,
+            "Лимит на команду, сек",
+            "shell_timeout",
+            min_value=10,
+            max_value=300,
+            help="Команда агента в терминале прерывается, если идёт дольше.",
+        )
+        bound(st.toggle, "Держать экран включённым", "keep_display")
+    bound(
+        st.text_input,
+        "Адрес Ollama",
+        "ollama_base",
+        help="Нужен только для локальных моделей.",
+    )
 
-
-def show_file(filesystem, path: str) -> None:
-    text = filesystem.read_file(path)
-    if text.startswith(("File not found", "Not a file", "Path outside")):
-        st.error(text)
-    else:
-        st.code(text, language="text")
+    with st.expander("Проверить SSH-подключение"):
+        render_ssh()
+    with st.expander("Справка"):
+        render_help()
 
 
 def render_ssh() -> None:
-    st.warning(
-        "Команда выполнится на указанном компьютере по SSH. Добавляйте только свои машины в локальной сети. "
-        "Пароль в форму не входит: используйте ключ."
-    )
-    with st.form("ssh_form"):
+    st.caption("Команда выполнится на указанном компьютере. Вход по ключу, пароль не спрашивается.")
+    with st.form("ssh_form", border=False):
         col1, col2 = st.columns(2)
-        with col1:
-            name = st.text_input("Имя устройства", value="device1")
-            host = st.text_input("Хост", placeholder="192.168.1.10")
-            command = st.text_input("Команда", value="uname -a")
-        with col2:
-            user = st.text_input("Пользователь", value="pi")
-            port = st.number_input("Порт", value=22, min_value=1, max_value=65535)
-            key_path = st.text_input("Путь к SSH-ключу", placeholder="~/.ssh/id_ed25519")
-        submitted = st.form_submit_button("Выполнить по SSH", use_container_width=True)
+        host = col1.text_input("Хост", placeholder="192.168.1.10")
+        user = col2.text_input("Пользователь", value="pi")
+        key_path = col1.text_input("Путь к SSH-ключу", placeholder="~/.ssh/id_ed25519")
+        port = col2.number_input("Порт", value=22, min_value=1, max_value=65535)
+        command = st.text_input("Команда", value="uname -a")
+        submitted = st.form_submit_button("Выполнить")
     if not submitted:
-        st.caption("Результат появится после отправки формы.")
         return
-    if not host.strip() or not command.strip() or not name.strip():
-        st.error("Нужны имя, хост и команда.")
+    if not host.strip() or not command.strip():
+        st.error("Нужны хост и команда.")
         return
     from tools.remote import RemoteDevice, RemoteManager
 
     manager = RemoteManager()
     manager.add_device(
         RemoteDevice(
-            name=name.strip(),
+            name="check",
             host=host.strip(),
             user=user.strip() or "root",
             port=int(port),
             key_path=str(Path(key_path).expanduser()) if key_path.strip() else None,
         )
     )
-    st.code(manager.run_ssh(name.strip(), command.strip()), language="text")
+    with st.spinner("Подключаюсь…"):
+        output = manager.run_ssh("check", command.strip())
+    st.code(output, language="text")
 
 
 def render_help() -> None:
     st.markdown(
         """
-### Оформление
-Слева четыре темы: Бумага, Ночь, Обжиг и Хвоя. Выбор пишется в `user_settings.json` и остаётся после перезапуска.
+**С чего начать.** Получите бесплатный ключ в Google AI Studio или OpenRouter, вставьте его выше
+и сохраните. Затем откройте «Запуск», опишите задачу и нажмите «Запустить».
 
-### Как начать
-1. Создайте ключ хотя бы одного бесплатного варианта: Google AI Studio для Gemini или OpenRouter для моделей с суффиксом `:free`.
-2. Вставьте ключ слева и нажмите «Сохранить ключи».
-3. В разделе «Запуск» оставьте пайплайн `code_only` и опишите задачу.
+**Локальные модели.** Установите [Ollama](https://ollama.com/library), скачайте веса
+(`ollama pull gemma4`) и выберите модель с пометкой Local в разделе «Агенты». Ключ не нужен.
 
-Роли по умолчанию смотрят на Gemini с free tier, так что одного ключа Google достаточно. Платные модели выбираются в разделе «Агенты».
+**Где что лежит**
 
-### Где что лежит
 | Что | Файл |
 | --- | --- |
-| Ключи | `.env` (не коммитится) |
-| Роли, пайплайн, папка, тема | `user_settings.json` |
-| Каталог, цены, источники | `config/models_catalog.yaml` |
-| Промпты ролей | `config/agents.yaml` |
+| Ключи | `.env` |
+| Выбранные модели, режим, папка, тема | `user_settings.json` |
+| Каталог моделей и цены | `config/models_catalog.yaml` |
+| Промпты ролей и режимы | `config/agents.yaml` |
 | Отчёты запусков | `results/` |
+| Копии файлов перед изменением | `backups/` |
 
-### Ollama
-Локальные модели помечены **Local** и стоят $0 за токены API. Установите [Ollama](https://ollama.com/library), скачайте веса (`ollama pull gemma4`) и оставьте адрес `http://localhost:11434`.
-
-### Безопасность
-- Файловые инструменты не выходят из выбранной папки. Соседняя папка с тем же префиксом имени тоже снаружи.
-- Перед перезаписью и удалением делается копия в `backups/`.
-- Опасные шаблоны shell блокируются.
-- SSH ходит только на хост, который вы явно указали в форме.
-
-### Цены
-Дата сверки указана у каждой модели. Провайдеры меняют прайс без предупреждения в этом репозитории. Если в карточке **unknown**, официальная цифра на момент сверки не подтверждалась.
-        """
+**Безопасность.** Файловые инструменты агентов не выходят из выбранной папки, перед перезаписью и
+удалением делается копия. Команды в терминале стартуют в этой папке, не видят ваших ключей API и
+проходят через список запрещённых шаблонов — но это страховка, а не песочница: запускайте агентов
+в папке, которую не жалко, и не давайте им задач от имени администратора.
+"""
     )
+
+
+# ---------- entry ----------
 
 
 def main() -> None:
-    st.set_page_config(page_title="Multi-Agent Studio", page_icon="¶", layout="wide")
-    cfg = (
-        load_config(ROOT / "config" / "agents.yaml")
-        if (ROOT / "config" / "agents.yaml").exists()
-        else {}
-    )
+    st.set_page_config(page_title="Multi-Agent Studio", page_icon="◆", layout="wide")
+    config_path = ROOT / "config" / "agents.yaml"
+    cfg = load_config(config_path) if config_path.exists() else {}
     catalog = load_models_catalog()
-    runnable = runnable_models(catalog)
-    model_choices = [key for key in sorted_model_keys(runnable)]
-    if not model_choices:
-        model_choices = ["gemini_38_flash"]
-    user_set = load_user_settings()
-    init_state(cfg, user_set, model_choices)
-    inject_css()
-    pipelines = cfg.get("pipelines") or {
-        "single": {"steps": ["developer"], "description": "одна роль"}
-    }
-    pipe_name = st.session_state.pipeline_select
-    steps = list((pipelines.get(pipe_name) or {}).get("steps") or ["developer"])
+    model_choices = sorted_model_keys(runnable_models(catalog)) or ["gemini_38_flash"]
+    init_state(cfg, load_user_settings(), model_choices)
+    st.markdown(
+        theme_stylesheet(st.session_state.theme, st.session_state.palette), unsafe_allow_html=True
+    )
+    pipelines = cfg.get("pipelines") or {"single": {"steps": ["developer"]}}
     render_sidebar()
-    render_header(catalog, active_agent_ids(cfg, steps))
-    screen = resolve_screen(st.session_state.get("screen"))
+    screen = resolve_screen(st.session_state.screen)
     if screen == "agents":
         render_agents(cfg, catalog, model_choices)
     elif screen == "models":
         render_models(catalog)
     elif screen == "files":
         render_files()
-    elif screen == "ssh":
-        render_ssh()
-    elif screen == "help":
-        render_help()
+    elif screen == "settings":
+        render_settings()
     else:
         render_run(cfg, catalog, pipelines)
 

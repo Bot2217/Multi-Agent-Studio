@@ -67,3 +67,70 @@ def test_shell_blocks_dangerous_pattern_and_runs_echo(tmp_path):
     output = runner.run("echo studio")
     assert "studio" in output
     assert "exit code: 0" in output
+
+
+def test_json_in_prose_is_not_a_tool_call(tmp_path):
+    runtime = AgentRuntime(str(tmp_path), str(tmp_path / "backups"), api_key="x")
+    assert runtime._parse_tool('Пример: {"name": "delete_path", "path": "x"} — так не надо') is None
+    bare = runtime._parse_tool('{"name": "remote_add", "args": {"name": "pi", "host": "1.2.3.4"}}')
+    assert bare["name"] == "remote_add"
+    assert bare["args"]["host"] == "1.2.3.4"
+    nested = runtime._parse_tool(
+        '```tool\n{"name": "write_file", "args": {"path": "a.json", "content": "{\\"k\\": {}}\\n```"}}\n```'
+    )
+    assert nested["args"]["path"] == "a.json"
+    fenced = runtime._parse_tool('```json\n{"name": "finish", "args": {"summary": "ok"}}\n```')
+    assert fenced["name"] == "finish"
+
+
+def test_every_overwrite_keeps_its_own_backup(tmp_path):
+    fs = WorkspaceFS(tmp_path / "ws", tmp_path / "backups")
+    for text in ("v1", "v2", "v3", "v4"):
+        fs.write_file("a.txt", text)
+    kept = sorted(p.read_text(encoding="utf-8") for p in (tmp_path / "backups").iterdir())
+    assert kept == ["v1", "v2", "v3"]
+    for _ in range(2):
+        (tmp_path / "ws" / "d").mkdir()
+        assert "Deleted" in fs.delete_path("d")
+
+
+def test_shell_guard_rails(tmp_path, monkeypatch):
+    runner = ShellRunner(tmp_path, timeout=10)
+    for bad in (
+        "rm  -rf   /",
+        "sudo rm -rf ~",
+        'echo x; "/sbin/shut""down" now',
+        "mkfs.ext4 /dev/sda",
+    ):
+        assert runner.run(bad).startswith("Blocked"), bad
+    assert "exit code: 0" in runner.run('echo "docs about mkfs and rm -rf ./build"')
+    monkeypatch.setenv("GOOGLE_API_KEY", "SECRET123")
+    monkeypatch.setenv("STUDIO_PLAIN", "visible")
+    out = runner.run("echo [$GOOGLE_API_KEY] [$STUDIO_PLAIN]")
+    assert "SECRET123" not in out
+    assert "visible" in out
+    assert "outside workspace" in runner.run("pwd", cwd="/")
+    (tmp_path / "sub").mkdir()
+    assert "sub" in runner.run("pwd", cwd="sub")
+
+
+def test_power_manager_releases_its_process(monkeypatch):
+    from tools.power import PowerManager
+
+    class FakeProc:
+        terminated = False
+
+        def terminate(self):
+            self.terminated = True
+
+        def wait(self, timeout=None):
+            return 0
+
+    proc = FakeProc()
+    manager = PowerManager()
+    manager._system = "Darwin"
+    monkeypatch.setattr("tools.power.subprocess.Popen", lambda *a, **k: proc)
+    assert "ON" in manager.start("system")
+    assert "OFF" in manager.stop()
+    assert proc.terminated
+    assert manager.stop() == "Keep-awake was not active"

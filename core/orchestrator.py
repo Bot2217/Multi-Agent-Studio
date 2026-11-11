@@ -9,7 +9,7 @@ from typing import Callable, Optional
 
 import yaml
 
-from core.agent_runtime import AgentRuntime
+from core.agent_runtime import AgentRuntime, RunStopped
 from core.catalog import KEY_ENV, api_base_for, load_models_catalog, provider_of
 from core.catalog import resolve_model as resolve_catalog_model
 
@@ -31,6 +31,19 @@ def resolve_model(cfg: dict, model_key: str, catalog: Optional[dict] = None) -> 
     return resolve_catalog_model(model_key, cfg, catalog)
 
 
+HANDOFF_LIMIT = 6000
+
+
+def handoff(result: str) -> str:
+    """What the next role sees: the role's own summary when it wrote one, else the tail."""
+    marker = "=== ИТОГ"
+    if marker in result:
+        summary = result[result.rindex(marker) :]
+        if len(summary) > 200:
+            return summary[:HANDOFF_LIMIT]
+    return result[-HANDOFF_LIMIT:]
+
+
 class Orchestrator:
     """Runs a pipeline of role-agents sequentially, passing context forward."""
 
@@ -46,6 +59,8 @@ class Orchestrator:
         log_fn: Optional[Callable[[str], None]] = None,
         overrides: Optional[dict[str, dict]] = None,
         pipeline_name: str = "full",
+        should_stop: Optional[Callable[[], bool]] = None,
+        step_fn: Optional[Callable[[int, int, str], None]] = None,
     ):
         self.cfg = config or load_config(config_path)
         self.workspace = workspace
@@ -56,7 +71,10 @@ class Orchestrator:
         self.log = log_fn or (lambda s: None)
         self.overrides = overrides or {}
         self.pipeline_name = pipeline_name
-        self.power = None
+        self.should_stop = should_stop or (lambda: False)
+        self.step_fn = step_fn or (lambda index, total, name: None)
+        # "ok", "failed" (a role raised) or "stopped" (the user asked to stop)
+        self.outcome = "ok"
         self.catalog = load_models_catalog()
 
     def _agent_cfg(self, agent_id: str) -> dict:
@@ -100,22 +118,21 @@ class Orchestrator:
 
         context_parts: list[str] = []
         reports: list[str] = []
-        last_runtime: Optional[AgentRuntime] = None
+        self.outcome = "ok"
 
-        for aid in steps:
+        for index, aid in enumerate(steps, 1):
             ac = self._agent_cfg(aid)
             name = ac.get("name", aid)
+            if self.should_stop():
+                self.outcome = "stopped"
+                break
+            self.step_fn(index, len(steps), name)
             model_key = ac.get("model", "claude_sonnet_55")
             model_id = resolve_model(self.cfg, model_key, self.catalog)
             meta = self.catalog.get(model_key) or {}
             temp = float(ac.get("temperature", 0.2))
             tools = ac.get("tools")
-            if tools is not None and len(tools) == 0:
-                allowed = []
-            elif tools is None:
-                allowed = None
-            else:
-                allowed = list(tools)
+            allowed = None if tools is None else list(tools)
             system = ac.get("system") or ""
 
             api_key = self._api_key_for_model(model_id)
@@ -127,29 +144,38 @@ class Orchestrator:
                 continue
 
             self.log(f"\n>>> {name} ({aid}) | model={model_id} | tools={allowed}")
-            runtime = AgentRuntime(
-                workspace=self.workspace,
-                backup_dir=self.backup_dir,
-                model=model_id,
-                api_key=api_key,
-                base_url=api_base_for(model_id, meta),
-                temperature=temp,
-                max_steps=self.max_steps,
-                shell_timeout=self.shell_timeout,
-                log_fn=self.log,
-                system_prompt=system,
-                allowed_tools=allowed,
-                role_name=name,
-            )
-            last_runtime = runtime
-            ctx = "\n\n".join(context_parts) if context_parts else ""
-            result = runtime.run(task, context=ctx)
+            try:
+                runtime = AgentRuntime(
+                    workspace=self.workspace,
+                    backup_dir=self.backup_dir,
+                    model=model_id,
+                    api_key=api_key,
+                    base_url=api_base_for(model_id, meta),
+                    temperature=temp,
+                    max_steps=self.max_steps,
+                    shell_timeout=self.shell_timeout,
+                    log_fn=self.log,
+                    system_prompt=system,
+                    allowed_tools=allowed,
+                    role_name=name,
+                    should_stop=self.should_stop,
+                )
+                ctx = "\n\n".join(context_parts) if context_parts else ""
+                result = runtime.run(task, context=ctx)
+            except RunStopped:
+                self.outcome = "stopped"
+                self.log(f"[{name}] остановлено пользователем")
+                reports.append(f"## {name}\n\nОстановлено пользователем.")
+                break
+            except Exception as exc:
+                # One failing role must not throw away what earlier roles produced.
+                self.outcome = "failed"
+                msg = f"[ОШИБКА {name}] {type(exc).__name__}: {exc}"
+                self.log(msg)
+                reports.append(f"## {name}\n\n{msg}")
+                break
             reports.append(f"## {name}\n\n{result}")
-            summary = result[-3000:] if len(result) > 3000 else result
-            context_parts.append(f"Отчёт агента «{name}»:\n{summary}")
-
-        if last_runtime:
-            self.power = last_runtime.power
+            context_parts.append(f"Отчёт агента «{name}»:\n{handoff(result)}")
 
         header = f"# Pipeline: {self.pipeline_name}\n# Steps: {' → '.join(steps)}\n\n"
         return header + "\n\n---\n\n".join(reports)

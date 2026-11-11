@@ -1,10 +1,7 @@
+# Цвета задаёт core/themes.py: светлая и тёмная темы переключаются в приложении.
 [theme]
 base = "light"
 primaryColor = "#b8432f"
-backgroundColor = "#f4efe4"
-secondaryBackgroundColor = "#ebe3d4"
-textColor = "#241c14"
-font = "sans serif"
 
 [client]
 toolbarMode = "minimal"
