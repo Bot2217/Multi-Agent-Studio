@@ -1,12 +1,13 @@
-# Справочник Multi-Agent Studio
+# Справочник Улей
 
-Локальное приложение на Streamlit. Роли идут по пайплайну, модели вызываются через LiteLLM, ключи остаются в `.env`.
+Локальное приложение. Роли идут по пайплайну, модели вызываются через LiteLLM, ключи остаются в `.env`. Репозиторий на GitHub по-прежнему называется Multi-Agent-Studio. В окне программа называется «Улей».
 
 Короткий запуск описан в [README](../README.md). Здесь подробности.
 
 ## Содержание
 
 - [Установка и неполадки](#install)
+- [Настольное приложение](#desktop)
 - [Ключи API](#keys)
 - [Каталог моделей](#catalog)
 - [Агенты](#agents)
@@ -20,7 +21,60 @@
 
 ## Установка и неполадки
 
-Нужен Python 3. Команда `python` или, на Windows, `py` должна быть в `PATH`.
+Обычному пользователю установщик не нужен из этого репозитория вручную: скачайте его со страницы [Releases](https://github.com/Bot2217/Multi-Agent-Studio/releases). Разработка из исходников описана ниже и в README.
+
+<a id="desktop"></a>
+
+### Настольное приложение «Улей»
+
+Окно программы, без браузера. Внутри лежит замороженный Python (PyInstaller), системный Python не нужен. Имя установщика и пункт меню — «Улей». Файл программы — `ulei`. Идентификатор пакета — `com.bot2217.ulei`.
+
+| Система | Файл |
+| --- | --- |
+| Windows | NSIS `.exe` и MSI |
+| macOS | `.dmg` для архитектуры раннера `macos-latest` (Apple Silicon) |
+| Linux | `.AppImage` и `.deb` |
+
+Подпись кода не покупалась. Windows SmartScreen пишет «неизвестный издатель»: «Подробнее», затем «Выполнить в любом случае». macOS может написать, что программу нельзя открыть: правый клик по «Улей» → «Открыть».
+
+Ключи, `user_settings.json`, папка `workspace`, отчёты и копии лежат в каталоге пользователя `ulei`:
+
+- Windows: `%APPDATA%\ulei`
+- macOS: `~/Library/Application Support/ulei`
+- Linux: `~/.local/share/ulei` или `$XDG_DATA_HOME/ulei`
+
+При первом запуске, если рядом с текущей папкой или в `~/Multi-Agent-Studio` уже есть `.env` или `user_settings.json`, они копируются один раз. Существующие файлы в каталоге `ulei` не затираются.
+
+Обновление установленной копии: при старте программа смотрит GitHub Releases. Если есть новая версия, окно спрашивает «Доступно обновление» и предлагает «Установить и перезапустить». Черновик релиза пользователям не виден: его нужно опубликовать.
+
+Подпись обновлений делается ключом minisign. Приватный ключ в репозиторий не кладётся. На машине владельца:
+
+```bash
+cd desktop
+npm install
+npx tauri signer generate -w ~/.tauri/ulei.key
+```
+
+Команда печатает публичный ключ и путь к приватному. В GitHub → Settings → Secrets and variables → Actions добавьте:
+
+| Secret | Что положить |
+| --- | --- |
+| `TAURI_SIGNING_PRIVATE_KEY` | содержимое файла `~/.tauri/ulei.key` целиком |
+| `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` | пароль, который спросили при `signer generate`. Если пароль пустой, секрет всё равно создайте пустым |
+| `TAURI_SIGNING_PUBLIC_KEY` | одна строка публичного ключа из вывода команды |
+
+Первый релиз: в `main` после слияния
+
+```bash
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+Workflow `release.yml` собирает три системы и кладёт черновик Release. Без секретов установщики всё равно собираются, но файлы подписи и `latest.json` не создаются, и кнопка обновления в программе молчит. Когда секреты есть, workflow подставляет публичный ключ в сборку и включает `createUpdaterArtifacts`.
+
+Крючки для платной подписи позже: секрет сертификата Windows (Authenticode) и Apple Developer ID в том же workflow, рядом с `TAURI_SIGNING_*`. Сейчас они не используются.
+
+`start.bat` и `start.sh` остаются режимом разработки: они поднимают Streamlit в браузере на `http://localhost:8501`.
 
 ### Windows
 
@@ -294,7 +348,7 @@ ruff check .
 pytest -q
 ```
 
-GitHub Actions на Ubuntu гоняет те же три команды. Отдельный job на `windows-latest` прогоняет `tests\windows_update_probe.cmd`: в отдельном клоне проверяется fast-forward, detached HEAD, локальные правки, недоступный origin и папка без `.git`. Затем job выполняет `start.bat setup` и проверяет, что в `.venv` импортируется Streamlit.
+GitHub Actions на Ubuntu гоняет ruff и pytest. Отдельный job на `windows-latest` прогоняет `tests\windows_update_probe.cmd`: в отдельном клоне проверяется fast-forward, detached HEAD, локальные правки, недоступный origin и папка без `.git`. Затем job выполняет `start.bat setup` и проверяет, что в `.venv` импортируется Streamlit. Workflow `release.yml` на теге `v*` собирает установщики «Улей» и, если заданы секреты подписи, `latest.json`. На pull request тот же workflow собирает Linux AppImage как дымовую проверку.
 
 Чтобы добавить модель:
 

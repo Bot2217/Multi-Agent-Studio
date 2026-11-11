@@ -12,8 +12,14 @@ import streamlit as st
 from dotenv import load_dotenv
 
 ROOT = Path(__file__).resolve().parent
+if getattr(sys, "frozen", False):
+    ROOT = Path(getattr(sys, "_MEIPASS"))
 sys.path.insert(0, str(ROOT))
-load_dotenv(ROOT / ".env")
+
+from core.paths import data_root
+
+DATA = data_root()
+load_dotenv(DATA / ".env")
 
 from core.catalog import (
     BILLING_BADGE,
@@ -73,9 +79,9 @@ BILLING_FILTERS = {
     "Локальные": "local",
 }
 
-DEFAULT_WS = ROOT / "workspace"
-BACKUPS = ROOT / "backups"
-RESULTS = ROOT / "results"
+DEFAULT_WS = DATA / "workspace"
+BACKUPS = DATA / "backups"
+RESULTS = DATA / "results"
 SKIP_DIRS = {".git", ".venv", "venv", "node_modules", "__pycache__", ".pytest_cache"}
 FILE_LIMIT = 300
 
@@ -284,13 +290,13 @@ def render_sidebar() -> None:
     current = resolve_screen(st.session_state.get("screen"))
     with st.sidebar:
         st.markdown(
-            '<div class="brand"><svg aria-hidden="true" width="32" height="32" viewBox="0 0 32 32" '
-            'fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" '
-            'stroke-linejoin="round"><rect x="3" y="3" width="26" height="26" rx="8"></rect>'
-            '<circle cx="11" cy="12" r="2.5"></circle><circle cx="21" cy="12" r="2.5"></circle>'
-            '<circle cx="16" cy="21" r="2.5"></circle>'
-            '<path d="M13.5 12h5M12.3 14.2l2.5 4.6M19.7 14.2l-2.5 4.6"></path></svg>'
-            "<div><b>Multi-Agent</b><small>Studio</small></div></div>",
+            '<div class="brand"><svg aria-hidden="true" width="32" height="32" viewBox="0 0 32 32">'
+            '<path fill="#c2f24e" d="M16 4.2 21.2 7.2v6L16 16.2 10.8 13.2v-6z"/>'
+            '<path fill="#e0a15a" d="M22.4 8.4 27.6 11.4v6l-5.2 3-5.2-3v-6z"/>'
+            '<path fill="#9be0b8" d="M9.6 8.4 14.8 11.4v6l-5.2 3-5.2-3v-6z"/>'
+            '<path fill="#eef0f4" d="M16 15.6 21.2 18.6v6L16 27.6 10.8 24.6v-6z"/>'
+            "</svg>"
+            "<div><b>Улей</b><small>студия</small></div></div>",
             unsafe_allow_html=True,
         )
         for screen_id, label in SCREENS:
@@ -1032,7 +1038,7 @@ def render_help() -> None:
 
 
 def main() -> None:
-    st.set_page_config(page_title="Multi-Agent Studio", page_icon="◆", layout="wide")
+    st.set_page_config(page_title="Улей", page_icon="⬡", layout="wide")
     config_path = ROOT / "config" / "agents.yaml"
     cfg = load_config(config_path) if config_path.exists() else {}
     catalog = load_models_catalog()

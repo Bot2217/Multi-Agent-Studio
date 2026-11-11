@@ -13,3 +13,6 @@ venv/
 .ruff_cache/
 *.command
 .dev-run.log
+build/
+dist/
+*.spec

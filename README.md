@@ -1,14 +1,24 @@
-# Multi-Agent Studio
+# Улей — многоагентная студия
 
 [![CI](https://github.com/Bot2217/Multi-Agent-Studio/actions/workflows/ci.yml/badge.svg)](https://github.com/Bot2217/Multi-Agent-Studio/actions/workflows/ci.yml)
 
-Локальная студия: несколько ролей по очереди делают одну задачу, у каждой своя модель.
+Несколько ролей по очереди делают одну задачу, у каждой своя модель. Программа называется «Улей» (Ulei, Hive). Репозиторий на GitHub не переименовывался.
 
 ![Окно «Запуск»](docs/screenshots/graphite-dark-run.png)
 
-## Как запустить
+## Скачай установщик
 
-Нужен Python 3. Открывать студию после запуска: [http://localhost:8501](http://localhost:8501).
+Готовые сборки: [Releases](https://github.com/Bot2217/Multi-Agent-Studio/releases). Браузер не нужен.
+
+- Windows: установщик `.exe` (и `.msi`). SmartScreen может написать «неизвестный издатель» — «Подробнее», затем «Выполнить в любом случае».
+- macOS: `.dmg`. Если система не открывает файл, правый клик по «Улей» → «Открыть».
+- Linux: `.AppImage` или `.deb`.
+
+При запуске «Улей» проверяет обновление. Если оно есть, появится «Доступно обновление» с кнопкой «Установить и перезапустить». Как устроены ключ подписи и первый тег — в [установке](docs/GUIDE.md#desktop).
+
+## Как запустить для разработки
+
+Нужен Python 3. Окно разработки открывается в браузере: [http://localhost:8501](http://localhost:8501).
 
 ### Windows
 
@@ -19,15 +29,9 @@
    cd Multi-Agent-Studio
    ```
 
-2. Запустите `start.bat` двойным щелчком или из cmd. Он создаст `.venv`, поставит зависимости и откроет студию.
+2. Запустите `start.bat`. Он создаст `.venv`, поставит зависимости и откроет студию.
 
-ZIP с GitHub ломает `start.bat`: в архиве у файла концы строк LF, и cmd режет команды. Клонирование через Git записывает файл правильно. Если архив уже скачан, не запускайте `start.bat`. Поставьте [Git](https://git-scm.com/download/win) и выполните команды выше либо запустите вручную:
-
-```bat
-python -m venv .venv
-.venv\Scripts\python.exe -m pip install -r requirements.txt
-.venv\Scripts\python.exe -m streamlit run app.py
-```
+ZIP с GitHub ломает `start.bat`: в архиве у файла концы строк LF. Клонируйте через Git.
 
 ### macOS и Linux
 
@@ -45,11 +49,13 @@ chmod +x start.sh
 3. В «Запуск» напишите задачу, проверьте режим и папку и нажмите «Запустить».
 4. Ход работы и итог появятся ниже; запуск можно остановить. Отчёт можно скачать.
 
-По умолчанию роли стоят на бесплатном тарифе Gemini. Другие бесплатные варианты (OpenRouter, Ollama) описаны в [каталоге](docs/GUIDE.md#catalog).
+По умолчанию роли стоят на бесплатном тарифе Gemini. Другие бесплатные варианты описаны в [каталоге](docs/GUIDE.md#catalog).
 
 ## Как обновить
 
-В папке проекта:
+Установленный «Улей» обновляется сам из Releases.
+
+Копия из git:
 
 ```bash
 git pull
@@ -62,6 +68,7 @@ git pull
 Подробности в [справочнике](docs/GUIDE.md):
 
 - [Установка и неполадки](docs/GUIDE.md#install)
+- [Настольное приложение](docs/GUIDE.md#desktop)
 - [Ключи API](docs/GUIDE.md#keys)
 - [Каталог моделей](docs/GUIDE.md#catalog)
 - [Агенты](docs/GUIDE.md#agents)
@@ -73,6 +80,4 @@ git pull
 
 ## English
 
-Local multi-agent studio. Each role calls its own model.
-
-Windows: `git clone https://github.com/Bot2217/Multi-Agent-Studio.git`, then `start.bat`. A GitHub ZIP breaks the batch file; clone instead. macOS and Linux: `./start.sh`. Open [http://localhost:8501](http://localhost:8501). The full guide is in Russian: [docs/GUIDE.md](docs/GUIDE.md).
+Ulei (“Улей”, Hive) is a local multi-agent studio. Download an installer from [Releases](https://github.com/Bot2217/Multi-Agent-Studio/releases). Windows SmartScreen may say the publisher is unknown. On macOS, right-click the app and choose Open. For development, clone `https://github.com/Bot2217/Multi-Agent-Studio.git` and run `start.bat` or `./start.sh`, then open [http://localhost:8501](http://localhost:8501). The guide is in Russian: [docs/GUIDE.md](docs/GUIDE.md).
