@@ -1,0 +1,8 @@
+# cmd.exe splits lines on CRLF. LF-only batch files drop a byte at each
+# boundary, so commands run as fragments. Git keeps the blob in UTF-8 and
+# checks the working copy out as CP866 (Russian console OEM) with CRLF.
+*.bat text working-tree-encoding=CP866 eol=crlf
+*.cmd text working-tree-encoding=CP866 eol=crlf
+
+# Bash launchers must stay LF. CRLF breaks the shebang on some systems.
+*.sh text eol=lf

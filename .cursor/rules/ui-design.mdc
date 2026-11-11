@@ -1,0 +1,75 @@
+---
+description: UI design brief and tokens for the Streamlit studio
+globs: app.py,core/themes.py,core/icons.py,**/*.css,assets/**,docs/screenshots/**,docs/GUIDE.md
+alwaysApply: false
+---
+
+Act as a Principal UI/UX Architect and Senior Product Designer. Your core mission is to elevate a functional, raw HTML/CSS interface into a premium, world-class digital product.
+
+When executing this redesign, you must adhere strictly to the following philosophical and technical framework:
+
+1. UNDERLYING PRODUCT APPROACH:
+- Function over decoration: Every visual change must improve readability, information density, or user flow. No aesthetic choices should be purely decorative or counter-intuitive.
+- High-fidelity & Scalability: Design with production-readiness in mind. The UI must look like a high-end SaaS or premium consumer app, not a generic bootstrap template.
+- Content is king: Treat real-world data, states, and text with priority. Use crisp typography and contrast to establish clear visual hierarchy.
+
+2. SPECIFIC DESIGN PRINCIPLES:
+- Bento Grid Layout: Structure components into distinct, scannable modular blocks with consistent margins (16px/24px) and organic border-radius (12px to 20px).
+- Dynamic Vector-First Aesthetic: Every graphical asset, icon, and chart must be crisp, lightweight, and custom vector/SVG. Avoid raster textures, generic stock clip-art, or messy gradients. Keep 2px line consistency across icons.
+- Micro-interactions & Affordance: Plan for interactive states. Buttons must feel tactile (subtle scaledowns on press), inputs must have clear focus rings, and transitions between tabs must be smooth and context-aware.
+- Advanced Color Theory: Move away from basic CSS color palettes. If dark mode, use rich charcoal/slate tones (e.g., #0d0e12) with absolute high-contrast neon/pastel accents for active states. Avoid 100% pure black or pure white unless intentionally used for typography.
+- Typographic Depth: Use geometric or humanist web fonts (e.g., Inter, Geist, SF Pro) with strict mathematical hierarchy (Fluid typography using CSS clamp() or strict proportional text scales).
+
+3. EXECUTION WORKFLOW:
+- Step 1: Analyze the structural layout of the current HTML. Identify the most critical user actions.
+- Step 2: Modernize the layout, moving it to modern Flexbox/Grid while grouping logical features into cards.
+- Step 3: Infuse vector graphics and custom UI components (tabs, loaders, status indicators) into the core layout.
+- Step 4: Add high-end visual polish (glassmorphism overlays, smooth transitions, functional dark mode contrast).
+
+## Project rules
+
+Interface copy stays Russian. Do not remove a working control to make a screen prettier.
+
+### Tokens
+
+Shared by every theme in `core/themes.py`:
+
+| Token | Value |
+| --- | --- |
+| space | 8, 12, 16, 24, 32 px. Cards use 16 px padding and 24 px gaps. |
+| radius | 12 px controls, 16 px metrics, 20 px bento cards |
+| type | `clamp()` scale: xs, sm, md, lg, xl. UI font Inter. Code and model IDs JetBrains Mono. |
+| motion | 160 ms, `cubic-bezier(0.2, 0.8, 0.2, 1)`. Press scales a button to 0.98. |
+| focus | 2 px accent outline, 2 px offset |
+
+| Theme | bg | surface | ink | accent | on accent |
+| --- | --- | --- | --- | --- | --- |
+| night (default) | #0d0e12 | #171a21 | #e7e9ee | #d6ff3e | #14160a |
+| paper | #efece6 | #f7f5f0 | #1c1e24 | #0f6b56 | #f6f3ec |
+| ember | #14110e | #211c17 | #f4ece4 | #ff9a4a | #1a1008 |
+
+No pure `#000` or `#fff` page fills. Saved ids `kiln` and `pine` map to ember and night.
+
+### Icons
+
+Draw in `core/icons.py`. Inline SVG only, 24 px viewBox, 2 px stroke, `currentColor`, round caps. Nav icons are CSS masks of those drawings. Do not add emoji or PNG icons.
+
+### Components
+
+- Sections are `st.container(key="card_...")` blocks, not loose widgets.
+- Primary button is the one next action. Secondary is an alternate. Tertiary is quiet. Danger uses a `danger_` key.
+- Tabs are the `nav_*` buttons, not `st.tabs`.
+- Status is text plus an icon. Empty states use `.slip`. Progress uses `.progress`.
+- Alerts stay dark type on a paper slip so they stay readable on dark themes.
+
+### Accessibility
+
+Body text on background must clear 7:1. Muted text, links, badge pairs, and button labels on the accent must clear 4.5:1. `contrast_issues()` must return an empty list. Honor `prefers-reduced-motion`. Every control keeps a visible focus ring.
+
+### Streamlit
+
+Inject one `<style>` block from `theme_stylesheet()` via `st.markdown(..., unsafe_allow_html=True)` after session state exists. Do not put untrusted text inside that block.
+
+Stable hooks: `data-testid` values `stSidebar`, `stButton`, `stMetric`, `stAlert`, `stExpander`, `stCode`, and widget classes `st-key-<key>`. BaseWeb `data-baseweb="input|select|textarea"` is usable but changes more often. Prefer `st-key-*` for our own components.
+
+`st.html` exists in recent Streamlit; this app still uses `st.markdown` for small HTML so older 1.4x installs keep working. A container's `key` does not wrap sibling widgets that are outside the `with` block. Glass blur is only on the sidebar. Do not paint the dataframe canvas by hand; the model list is an HTML table.
