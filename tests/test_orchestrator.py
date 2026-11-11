@@ -182,6 +182,41 @@ def test_run_job_writes_report_and_finishes(tmp_path, monkeypatch):
     assert "готово" in job.report_path.read_text(encoding="utf-8")
 
 
+def test_stop_does_not_wait_for_the_model(tmp_path, monkeypatch):
+    import threading
+    import time
+
+    import pytest
+
+    from core.agent_runtime import AgentRuntime, RunStopped
+
+    notes: list[str] = []
+    started = threading.Event()
+    runtime = AgentRuntime(
+        str(tmp_path),
+        str(tmp_path / "b"),
+        api_key="x",
+        log_fn=notes.append,
+        should_stop=started.is_set,
+    )
+
+    def hang(**_kwargs):
+        started.set()
+        time.sleep(30)
+
+    import sys
+    import types
+
+    fake = types.ModuleType("litellm")
+    fake.completion = hang
+    monkeypatch.setitem(sys.modules, "litellm", fake)
+    began = time.monotonic()
+    with pytest.raises(RunStopped):
+        runtime._llm([{"role": "user", "content": "hi"}])
+    assert time.monotonic() - began < 3
+    assert any("уже отправлен" in line for line in notes)
+
+
 def test_agent_stops_when_asked(tmp_path):
     import pytest
 

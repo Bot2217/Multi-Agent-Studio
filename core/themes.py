@@ -2,11 +2,21 @@
 
 from __future__ import annotations
 
+from core.icons import icon_css
+
 DEFAULT_THEME = "auto"
 THEME_ORDER = ("auto", "light", "dark")
 THEME_LABELS = {"auto": "Авто", "light": "Светлая", "dark": "Тёмная"}
-# Themes saved by older versions map onto the two that remain.
-LEGACY_THEMES = {"paper": "light", "kiln": "light", "night": "dark", "pine": "dark"}
+# Older saved theme ids carried both the mode and the palette.
+# night/pine were the charcoal theme, paper the light paper theme,
+# ember/kiln the dark warm theme.
+LEGACY_APPEARANCE = {
+    "night": ("dark", "graphite"),
+    "pine": ("dark", "graphite"),
+    "paper": ("light", "warm"),
+    "ember": ("dark", "warm"),
+    "kiln": ("dark", "warm"),
+}
 
 # Left-hand menu. First item is the home flow.
 SCREENS = (
@@ -149,10 +159,19 @@ def resolve_palette(name: str | None) -> str:
 
 def resolve_theme(name: str | None) -> str:
     key = str(name or "").strip().lower()
-    key = LEGACY_THEMES.get(key, key)
+    if key in LEGACY_APPEARANCE:
+        return LEGACY_APPEARANCE[key][0]
     if key in THEME_ORDER:
         return key
     return DEFAULT_THEME
+
+
+def migrate_appearance(theme: str | None, palette: str | None = None) -> tuple[str, str]:
+    """Mode and palette for a saved pair, including pre-palette theme ids."""
+    key = str(theme or "").strip().lower()
+    if key in LEGACY_APPEARANCE:
+        return LEGACY_APPEARANCE[key]
+    return resolve_theme(theme), resolve_palette(palette)
 
 
 def resolve_screen(name: str | None) -> str:
@@ -230,6 +249,7 @@ def _variables(theme: dict) -> str:
         "ok",
     ):
         lines.append(f"--{key.replace('_', '-')}: {theme[key]};")
+    lines.append(f"--primary-color: {theme['accent']};")
     for name, colors in theme["badges"].items():
         lines.append(f"--badge-{name}-bg: {colors['bg']};")
         lines.append(f"--badge-{name}-fg: {colors['fg']};")
@@ -259,7 +279,7 @@ def theme_stylesheet(theme_id: str | None, palette: str | None = None) -> str:
     )
     return (
         f"<style>\n{FONT_IMPORT}\n/* theme:{choice} palette:{resolve_palette(palette)} */\n"
-        f"{colors}\n{_BASE_CSS}\n{badge_css}\n</style>"
+        f"{colors}\n{_BASE_CSS}\n{icon_css()}\n{badge_css}\n</style>"
     )
 
 
@@ -353,8 +373,17 @@ header[data-testid="stHeader"] { background: transparent; }
 .brand { font-weight: 700; font-size: 1.05rem; color: var(--ink); margin: 0 0 var(--space-4); }
 .brand span { color: var(--accent); }
 :root body [data-testid="stSidebar"] [class*="st-key-nav_"] button {
+  display: inline-flex; align-items: center;
   justify-content: flex-start; text-align: left; min-height: 38px;
   background: transparent; border: 1px solid transparent; color: var(--ink);
+}
+:root body [class*="st-key-ex_"] button {
+  height: auto; min-height: 40px; white-space: normal; text-align: left;
+  justify-content: flex-start;
+}
+:root body [class*="st-key-ex_"] button p {
+  white-space: normal !important; overflow: visible !important; text-overflow: clip !important;
+  line-height: 1.35;
 }
 :root body [data-testid="stSidebar"] [class*="st-key-nav_"] button > div,
 :root body [data-testid="stSidebar"] [class*="st-key-nav_"] button > span {
@@ -410,9 +439,27 @@ header[data-testid="stHeader"] { background: transparent; }
   background: var(--note) !important;
 }
 [data-testid="stPopoverBody"] *, [data-testid="stTooltipContent"] * { color: var(--ink); }
-[data-testid="stSlider"] [role="slider"] { background: var(--accent) !important; border: 2px solid var(--surface) !important; }
+:root, [data-testid="stAppViewContainer"], [data-testid="stSidebar"] {
+  --primary-color: var(--accent) !important;
+}
+[data-testid="stSlider"] [data-baseweb="slider"] > div > div,
+[data-testid="stSlider"] [data-baseweb="slider"] [data-testid="stTickBar"] {
+  background: var(--accent) !important;
+}
+[data-testid="stSlider"] [role="slider"] {
+  background: var(--accent) !important; border: 2px solid var(--surface) !important;
+}
 [data-testid="stSlider"] [data-testid="stSliderThumbValue"] { color: var(--accent) !important; }
 [data-testid="stSlider"] [data-testid="stSliderTickBar"] * { color: var(--muted) !important; }
+[data-testid="stToggle"] [data-baseweb="checkbox"] div,
+[data-testid="stCheckbox"] [data-baseweb="checkbox"] > div:first-child {
+  border-color: var(--line) !important;
+}
+[data-testid="stToggle"] [aria-checked="true"],
+[data-testid="stToggle"] [aria-checked="true"] div,
+[data-testid="stToggle"] [data-baseweb="checkbox"] [aria-checked="true"] {
+  background: var(--accent) !important; border-color: var(--accent) !important;
+}
 :root body label[data-baseweb="checkbox"] > div:first-child { border-color: var(--line); }
 
 /* Current Streamlit widgets (no baseweb attributes) */
@@ -451,11 +498,20 @@ header[data-testid="stHeader"] { background: transparent; }
 [data-testid="stSidebar"] [data-testid="stButtonGroup"] [role="radiogroup"] { flex-wrap: nowrap; }
 
 /* Containers */
-[data-testid="stExpander"] details {
-  background: var(--surface); border: 1px solid var(--line) !important; border-radius: var(--radius-m);
+[data-testid="stExpander"] details,
+[data-testid="stExpander"] summary,
+[data-testid="stExpander"] summary:hover,
+[data-testid="stExpander"] summary:focus,
+[data-testid="stExpander"] summary:active {
+  background: var(--surface) !important; color: var(--ink) !important;
+  border-color: var(--line) !important;
 }
-[data-testid="stExpander"] summary, [data-testid="stExpander"] summary * { color: var(--ink); }
-[data-testid="stExpander"] summary:hover, [data-testid="stExpander"] summary:hover * { color: var(--accent); }
+[data-testid="stExpander"] details {
+  border: 1px solid var(--line) !important; border-radius: var(--radius-m);
+}
+[data-testid="stExpander"] summary, [data-testid="stExpander"] summary * { color: var(--ink) !important; }
+[data-testid="stExpander"] summary:hover { background: var(--raised) !important; }
+[data-testid="stExpander"] summary:hover, [data-testid="stExpander"] summary:hover * { color: var(--accent) !important; }
 [data-testid="stVerticalBlockBorderWrapper"], [data-testid="stForm"],
 :root body [class*="st-key-card_"], :root body .st-key-result_panel, :root body .st-key-live_panel {
   border-color: var(--line) !important;

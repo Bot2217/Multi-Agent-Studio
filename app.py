@@ -27,11 +27,13 @@ from core.catalog import (
 from core.orchestrator import load_config
 from core.runner import RunJob
 from core.themes import (
+    LEGACY_APPEARANCE,
     PALETTE_LABELS,
     PALETTE_ORDER,
     SCREENS,
     THEME_LABELS,
     THEME_ORDER,
+    migrate_appearance,
     resolve_palette,
     resolve_screen,
     resolve_theme,
@@ -56,14 +58,6 @@ KEY_LABELS = [
     ("Mistral", "MISTRAL_API_KEY", "Mistral и Codestral"),
     ("Cerebras", "CEREBRAS_API_KEY", "Cerebras"),
 ]
-
-SCREEN_ICONS = {
-    "run": ":material/play_arrow:",
-    "agents": ":material/group:",
-    "models": ":material/view_list:",
-    "files": ":material/folder:",
-    "settings": ":material/settings:",
-}
 
 PIPELINE_LABELS = {
     "code_only": "Быстро: код и ревью",
@@ -126,10 +120,15 @@ def init_state(cfg: dict, user_set: dict, model_choices: list[str]) -> None:
     state.setdefault("task", "")
     state.setdefault("job", None)
     state.setdefault("last_run", None)
-    state.setdefault("theme", resolve_theme(user_set.get("theme")))
-    state.setdefault("palette", resolve_palette(user_set.get("palette")))
+    theme, palette = migrate_appearance(user_set.get("theme"), user_set.get("palette"))
+    state.setdefault("theme", theme)
+    state.setdefault("palette", palette)
     state.setdefault("screen", resolve_screen(user_set.get("screen")))
     os.environ["OLLAMA_API_BASE"] = str(state.ollama_base or "").strip()
+    if str(user_set.get("theme") or "").strip().lower() in LEGACY_APPEARANCE:
+        state.theme = theme
+        state.palette = palette
+        persist()
 
 
 def default_override(agent_cfg: dict, model_choices: list[str]) -> dict:
@@ -298,7 +297,6 @@ def render_sidebar() -> None:
             st.button(
                 label,
                 key=f"nav_{screen_id}",
-                icon=SCREEN_ICONS.get(screen_id),
                 type="primary" if screen_id == current else "secondary",
                 width="stretch",
                 on_click=go,
@@ -357,9 +355,7 @@ def render_chain(cfg: dict, active: list[str], catalog: dict, no_key: set[str]) 
 
 def render_folder_picker() -> None:
     folder = workspace_dir()
-    with st.popover(
-        f"Папка: {folder.name or folder}", icon=":material/folder_open:", width="stretch"
-    ):
+    with st.popover(f"Папка: {folder.name or folder}", width="stretch"):
         st.caption("Агенты читают и пишут файлы только в этой папке.")
 
         def set_path() -> None:
@@ -414,8 +410,8 @@ def render_run(cfg: dict, catalog: dict, pipelines: dict) -> None:
             disabled=busy,
         )
         if not str(st.session_state.task).strip() and not busy:
-            for column, (index, text) in zip(st.columns(len(EXAMPLES)), enumerate(EXAMPLES)):
-                column.button(
+            for index, text in enumerate(EXAMPLES):
+                st.button(
                     text,
                     key=f"ex_{index}",
                     on_click=set_task,
@@ -460,7 +456,6 @@ def render_run(cfg: dict, catalog: dict, pipelines: dict) -> None:
 
         if st.button(
             "Запустить",
-            icon=":material/play_arrow:",
             type="primary",
             width="stretch",
             key="launch_run",
@@ -473,7 +468,6 @@ def render_run(cfg: dict, catalog: dict, pipelines: dict) -> None:
         render_chain(cfg, active, catalog, no_key)
         st.button(
             "Настроить роли",
-            icon=":material/tune:",
             on_click=go,
             args=("agents",),
             type="tertiary",
@@ -506,7 +500,6 @@ def render_history() -> None:
             st.button(
                 f"{when} · {task}",
                 key=f"hist_{index}",
-                icon=":material/history:",
                 on_click=set_task,
                 args=(task,),
                 width="stretch",
@@ -532,7 +525,6 @@ def render_files_card() -> None:
                 st.caption(f"и ещё {len(files) - 5}")
             st.button(
                 "Открыть файлы",
-                icon=":material/folder_open:",
                 on_click=go,
                 args=("files",),
                 type="tertiary",
@@ -558,7 +550,6 @@ def render_keys_card() -> None:
         st.markdown(f'<div class="rows">{"".join(rows)}</div>', unsafe_allow_html=True)
         st.button(
             "Управлять ключами",
-            icon=":material/key:",
             on_click=go,
             args=("settings",),
             type="tertiary",
@@ -613,7 +604,11 @@ def render_progress() -> None:
             head, action = st.columns([4, 1], vertical_alignment="center")
             with head:
                 if current.stopping:
-                    status_line("live", "Останавливаю…", "дождусь конца текущего шага")
+                    status_line(
+                        "live",
+                        "Останавливаю…",
+                        "прерываю команду; ответ модели, который уже ушёл, не жду",
+                    )
                 elif total:
                     status_line("live", f"{name} работает", f"шаг {index} из {total} · {elapsed}")
                 else:
@@ -766,7 +761,7 @@ def render_agents(cfg: dict, catalog: dict, model_choices: list[str]) -> None:
                 st.session_state.pop(prefix + agent_id, None)
         persist()
 
-    st.button("Вернуть как было", icon=":material/restart_alt:", type="tertiary", on_click=reset)
+    st.button("Вернуть как было", type="tertiary", on_click=reset)
 
 
 # ---------- models ----------

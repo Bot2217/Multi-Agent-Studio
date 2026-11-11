@@ -1,7 +1,12 @@
-# Цвета задаёт core/themes.py: светлая и тёмная темы переключаются в приложении.
+# Native widgets read these before the app stylesheet loads.
+# core/themes.py then sets --primary-color to the active palette accent,
+# so sliders, toggles and expanders are not stuck on one coral color.
 [theme]
-base = "light"
-primaryColor = "#b8432f"
+base = "dark"
+primaryColor = "#c2f24e"
+backgroundColor = "#0d0e12"
+secondaryBackgroundColor = "#15171d"
+textColor = "#eef0f4"
 
 [client]
 toolbarMode = "minimal"

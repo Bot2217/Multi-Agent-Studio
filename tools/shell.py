@@ -12,20 +12,31 @@ from __future__ import annotations
 import os
 import re
 import shlex
+import signal
 import subprocess
+import time
 from pathlib import Path
-from typing import Optional
+from typing import Callable, Optional
 
 SECRET_ENV_RE = re.compile(r"(API_KEY|TOKEN|SECRET|PASSWORD|PASSWD|CREDENTIAL)", re.IGNORECASE)
 
 # Matched against the command with whitespace collapsed and lowercased.
 _START = r"(?:^|[;&|(]\s*|\bsudo\s+|\bexec\s+)"
 DEFAULT_DENY_PATTERNS: list[tuple[str, str]] = [
-    ("rm on / or home", r"\brm\s+(?:-\S+\s+)*(?:/|/\*|~|~/|~/\*|\$home|\$\{home\})(?:\s|$|[;&|])"),
+    (
+        "rm of a system or home directory",
+        r"\brm\s+(?:-\S+\s+)*(?:~/?\*?|\$home\b|\$\{home\}|/(?:home|root|usr|bin|sbin|etc|var|boot|sys|proc|dev|system|users|volumes|opt|lib|applications)(?:/|\s|$|[;&|])|/(?:\s|$|[;&|])|/\*(?:\s|$|[;&|]))",
+    ),
     ("mkfs", _START + r"mkfs(?:\.\w+)?\b"),
     ("fork bomb", r":\s*\(\s*\)\s*\{"),
     ("dd to a device", r"\bdd\b[^;&|]*\bof=/dev/"),
     ("shutdown", _START + r"(?:\S*/)?(?:shutdown|reboot|poweroff|halt)\b"),
+    ("curl or wget piped to a shell", r"\b(?:curl|wget)\b[^|&;]*\|\s*(?:ba|z)?sh\b"),
+    (
+        "windows recursive delete",
+        _START + r"(?:del|erase|rd|rmdir)\b[^;&|]*\s/[a-z]*s\b",
+    ),
+    ("windows format drive", _START + r"format\s+[a-z]:"),
 ]
 
 
@@ -73,7 +84,34 @@ class ShellRunner:
             raise PermissionError(f"Working directory outside workspace: {candidate}") from None
         return candidate
 
-    def run(self, command: str, cwd: Optional[str] = None) -> str:
+    def _kill(self, proc: subprocess.Popen) -> None:
+        if proc.poll() is not None:
+            return
+        if os.name == "nt":
+            proc.terminate()
+        else:
+            try:
+                os.killpg(proc.pid, signal.SIGTERM)
+            except (ProcessLookupError, PermissionError, OSError):
+                proc.terminate()
+        try:
+            proc.wait(timeout=1)
+        except subprocess.TimeoutExpired:
+            if os.name == "nt":
+                proc.kill()
+            else:
+                try:
+                    os.killpg(proc.pid, signal.SIGKILL)
+                except (ProcessLookupError, PermissionError, OSError):
+                    proc.kill()
+            proc.wait(timeout=1)
+
+    def run(
+        self,
+        command: str,
+        cwd: Optional[str] = None,
+        should_stop: Optional[Callable[[], bool]] = None,
+    ) -> str:
         cmd = command.strip()
         if not cmd:
             return "Empty command"
@@ -97,25 +135,45 @@ class ShellRunner:
             return str(exc)
         if not workdir.exists():
             return f"Working directory does not exist: {workdir}"
+        if should_stop and should_stop():
+            return "Stopped by user"
 
         try:
-            result = subprocess.run(
+            proc = subprocess.Popen(
                 cmd,
                 shell=True,
                 cwd=str(workdir),
-                capture_output=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
                 text=True,
-                timeout=self.timeout,
                 env=clean_env(),
+                start_new_session=(os.name != "nt"),
             )
-            out = []
-            if result.stdout:
-                out.append(result.stdout)
-            if result.stderr:
-                out.append("--- stderr ---\n" + result.stderr)
-            out.append(f"\n[exit code: {result.returncode}]")
-            return "\n".join(out)
-        except subprocess.TimeoutExpired:
+        except Exception as exc:
+            return f"Shell error: {exc}"
+
+        deadline = time.monotonic() + self.timeout
+        stopped = False
+        timed_out = False
+        while proc.poll() is None:
+            if should_stop and should_stop():
+                stopped = True
+                self._kill(proc)
+                break
+            if time.monotonic() > deadline:
+                timed_out = True
+                self._kill(proc)
+                break
+            time.sleep(0.05)
+        stdout, stderr = proc.communicate()
+        if stopped:
+            return "Stopped by user"
+        if timed_out:
             return f"Command timed out after {self.timeout}s: {cmd}"
-        except Exception as e:
-            return f"Shell error: {e}"
+        out = []
+        if stdout:
+            out.append(stdout)
+        if stderr:
+            out.append("--- stderr ---\n" + stderr)
+        out.append(f"\n[exit code: {proc.returncode}]")
+        return "\n".join(out)
