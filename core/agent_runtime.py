@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 import re
+import threading
 import time
 from typing import Any, Callable, Optional
 
@@ -79,7 +80,9 @@ class AgentRuntime:
             "move_path": lambda a: self.fs.move_path(a["src"], a["dst"]),
             "copy_path": lambda a: self.fs.copy_path(a["src"], a["dst"]),
             "search_text": lambda a: self.fs.search_text(a["pattern"], a.get("path", ".")),
-            "run_shell": lambda a: self.shell.run(a["command"], a.get("cwd")),
+            "run_shell": lambda a: self.shell.run(
+                a["command"], a.get("cwd"), should_stop=self.should_stop
+            ),
             "remote_list": lambda a: self.remote.list_devices(),
             "remote_add": lambda a: self.remote.add_device(
                 RemoteDevice(
@@ -134,9 +137,12 @@ class AgentRuntime:
             kwargs["api_base"] = self.base_url
 
         for delay in (*RETRY_DELAYS, None):
+            if self.should_stop():
+                raise RunStopped()
             try:
-                resp = completion(**kwargs)
-                return resp.choices[0].message.content or ""
+                return self._complete(completion, kwargs)
+            except RunStopped:
+                raise
             except Exception as exc:
                 kind = type(exc).__name__.lower()
                 if delay is None or not any(tag in kind for tag in RETRYABLE):
@@ -144,6 +150,34 @@ class AgentRuntime:
                 self.log(f"[{self.role_name}] {type(exc).__name__}, повтор через {delay} с")
                 self._sleep(delay)
         return ""
+
+    def _complete(self, completion, kwargs: dict[str, Any]) -> str:
+        """Run one model call, but stop waiting if the user hits Stop.
+
+        The HTTP request cannot be revoked at every provider. Stopping means
+        this process stops waiting; the provider may still finish the request.
+        """
+        holder: dict[str, Any] = {}
+
+        def invoke() -> None:
+            try:
+                holder["resp"] = completion(**kwargs)
+            except Exception as exc:
+                holder["err"] = exc
+
+        worker = threading.Thread(target=invoke, daemon=True)
+        worker.start()
+        while worker.is_alive():
+            if self.should_stop():
+                self.log(
+                    f"[{self.role_name}] остановка: запрос к модели уже отправлен, "
+                    "ждать ответ не будем. Провайдер может досчитать его у себя."
+                )
+                raise RunStopped()
+            worker.join(0.2)
+        if "err" in holder:
+            raise holder["err"]
+        return holder["resp"].choices[0].message.content or ""
 
     def _sleep(self, seconds: float) -> None:
         deadline = time.monotonic() + seconds

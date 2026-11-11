@@ -21,14 +21,22 @@ def test_two_palettes_each_light_and_dark():
 
 
 def test_unknown_and_legacy_choices():
+    from core.themes import LEGACY_APPEARANCE, migrate_appearance
+
     assert resolve_theme(None) == DEFAULT_THEME == "auto"
     assert resolve_theme("neon") == "auto"
     assert resolve_theme("  DARK ") == "dark"
-    assert resolve_theme("paper") == "light"
-    assert resolve_theme("pine") == "dark"
     assert resolve_palette(None) == DEFAULT_PALETTE == "graphite"
     assert resolve_palette("WARM") == "warm"
     assert resolve_palette("neon") == "graphite"
+    assert migrate_appearance("night") == ("dark", "graphite")
+    assert migrate_appearance(" pine ") == ("dark", "graphite")
+    assert migrate_appearance("paper", "graphite") == ("light", "warm")
+    assert migrate_appearance("ember") == ("dark", "warm")
+    assert migrate_appearance("kiln") == ("dark", "warm")
+    assert migrate_appearance("dark", "warm") == ("dark", "warm")
+    assert migrate_appearance("light", None) == ("light", "graphite")
+    assert set(LEGACY_APPEARANCE) == {"night", "pine", "paper", "ember", "kiln"}
 
 
 def test_every_theme_meets_contrast():
@@ -51,6 +59,12 @@ def test_stylesheet_per_choice():
             assert "prefers-reduced-motion" in css
             assert "--badge-free-bg" in css
             assert "--accent-soft" in css
+            assert "st-key-nav_run" in css
+            assert "st-key-nav_settings" in css
+            assert '[data-testid="stSlider"]' in css
+            assert '[data-testid="stExpander"]' in css
+        assert f"--primary-color: {pair['light']['accent']}" in light
+        assert f"--primary-color: {pair['dark']['accent']}" in dark
 
 
 def test_screens():
@@ -61,6 +75,7 @@ def test_screens():
 
 
 def test_saved_theme_roundtrip(tmp_path, monkeypatch):
+    from core.themes import migrate_appearance
     from core.ui_helpers import load_user_settings, save_user_settings
 
     path = tmp_path / "user_settings.json"
@@ -70,3 +85,20 @@ def test_saved_theme_roundtrip(tmp_path, monkeypatch):
     assert resolve_theme(loaded["theme"]) == "dark"
     assert resolve_palette(loaded["palette"]) == "warm"
     assert resolve_theme(loaded.get("missing")) == "auto"
+
+    for legacy, expected in {
+        "night": ("dark", "graphite"),
+        "pine": ("dark", "graphite"),
+        "paper": ("light", "warm"),
+        "ember": ("dark", "warm"),
+        "kiln": ("dark", "warm"),
+    }.items():
+        save_user_settings({"theme": legacy, "screen": "run"})
+        raw = load_user_settings()
+        theme, palette = migrate_appearance(raw.get("theme"), raw.get("palette"))
+        save_user_settings({"theme": theme, "palette": palette, "screen": raw.get("screen")})
+        again = load_user_settings()
+        assert migrate_appearance(again["theme"], again["palette"]) == expected
+        assert again["theme"] == expected[0]
+        assert again["palette"] == expected[1]
+        assert again["screen"] == "run"

@@ -30,6 +30,10 @@ PATHS = {
     "check": '<path d="M5 12.5 9.5 17 19 7.5"/>',
     "alert": '<path d="M12 4.5 20.5 19h-17z"/><path d="M12 10v4.2M12 16.8h.01"/>',
     "sun": '<circle cx="12" cy="12" r="3.5"/><path d="M12 3.5v2M12 18.5v2M3.5 12h2M18.5 12h2M6 6l1.4 1.4M16.6 16.6 18 18M18 6l-1.4 1.4M7.4 16.6 6 18"/>',
+    "gear": (
+        '<circle cx="12" cy="12" r="3"/>'
+        '<path d="M12 3.5v2M12 18.5v2M3.5 12h2M18.5 12h2M5.6 5.6l1.5 1.5M16.9 16.9l1.5 1.5M18.4 5.6l-1.5 1.5M7.1 16.9l-1.5 1.5"/>'
+    ),
 }
 
 NAV_ICONS = {
@@ -37,8 +41,7 @@ NAV_ICONS = {
     "agents": "users",
     "models": "grid",
     "files": "folder",
-    "ssh": "terminal",
-    "help": "help",
+    "settings": "gear",
 }
 
 
@@ -56,7 +59,7 @@ def _mask_svg(name: str) -> str:
     body = PATHS[name]
     return (
         '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" '
-        'stroke="%23000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+        'stroke="#000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
         f"{body}</svg>"
     )
 

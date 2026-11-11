@@ -44,11 +44,12 @@ Shared by every theme in `core/themes.py`:
 
 | Theme | bg | surface | ink | accent | on accent |
 | --- | --- | --- | --- | --- | --- |
-| night (default) | #0d0e12 | #171a21 | #e7e9ee | #d6ff3e | #14160a |
-| paper | #efece6 | #f7f5f0 | #1c1e24 | #0f6b56 | #f6f3ec |
-| ember | #14110e | #211c17 | #f4ece4 | #ff9a4a | #1a1008 |
+| graphite dark (default look) | #0d0e12 | #15171d | #eef0f4 | #c2f24e | #12160a |
+| graphite light | #f1f2f5 | #fbfbfc | #14161b | #2c6a12 | #f6fbf1 |
+| warm light | #f4efe4 | #fffaf3 | #241c14 | #b8432f | #fffaf3 |
+| warm dark | #17130f | #241e18 | #f6f1e7 | #e0a15a | #1c140c |
 
-No pure `#000` or `#fff` page fills. Saved ids `kiln` and `pine` map to ember and night.
+The saved choice is a mode (`auto`, `light`, `dark`) plus a palette (`graphite`, `warm`). Default mode is `auto`, default palette is `graphite`. Legacy ids: `night` and `pine` become dark + graphite; `paper` becomes light + warm; `ember` and `kiln` become dark + warm. No pure `#000` or `#fff` page fills.
 
 ### Icons
 
