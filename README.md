@@ -55,7 +55,7 @@ chmod +x start.sh
 git pull
 ```
 
-На Windows следующий запуск `start.bat` тоже делает `git pull`. На macOS и Linux — `./start.sh --update`.
+На Windows следующий запуск `start.bat` сам делает `git pull --ff-only`. Если обновление не удалось, студия все равно запускается. ZIP с GitHub не обновляется: в нем нет `.git`, нужен `git clone`. На macOS и Linux обновление только по просьбе: `./start.sh --update`.
 
 ## Дальше
 
