@@ -40,6 +40,11 @@
     ],
     "shortDescription": "Улей — многоагентная студия",
     "longDescription": "Несколько ролей по очереди делают одну задачу. Окно программы, без браузера.",
+    "macOS": {
+      "signingIdentity": "-",
+      "hardenedRuntime": true,
+      "entitlements": "entitlements.plist"
+    },
     "windows": {
       "wix": {
         "language": "ru-RU"
