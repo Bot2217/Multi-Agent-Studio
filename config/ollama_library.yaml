@@ -1,0 +1,68 @@
+# Curated Ollama library. Sizes are approximate install weights, not a promise.
+# A live fetch of https://ollama.com/library can add names; these tags stay the fallback.
+models:
+  - id: llama3.2
+    name: Llama 3.2
+    summary: Небольшая открытая модель Meta для обычных задач.
+    tags:
+      - {tag: "1b", size_gb: 1.3, ram_gb: 2}
+      - {tag: "3b", size_gb: 2.0, ram_gb: 4}
+  - id: llama3.1
+    name: Llama 3.1
+    summary: Более крупная Llama для длинных ответов.
+    tags:
+      - {tag: "8b", size_gb: 4.9, ram_gb: 8}
+  - id: qwen2.5
+    name: Qwen 2.5
+    summary: Модель Alibaba, хорошо держит русский и английский.
+    tags:
+      - {tag: "3b", size_gb: 1.9, ram_gb: 4}
+      - {tag: "7b", size_gb: 4.7, ram_gb: 8}
+  - id: qwen2.5-coder
+    name: Qwen 2.5 Coder
+    summary: Вариант Qwen для кода.
+    tags:
+      - {tag: "1.5b", size_gb: 1.0, ram_gb: 2}
+      - {tag: "7b", size_gb: 4.7, ram_gb: 8}
+  - id: qwen3
+    name: Qwen 3
+    summary: Следующее поколение Qwen.
+    tags:
+      - {tag: "4b", size_gb: 2.5, ram_gb: 4}
+      - {tag: "8b", size_gb: 5.2, ram_gb: 8}
+  - id: mistral
+    name: Mistral
+    summary: Компактная сильная модель на 7B.
+    tags:
+      - {tag: "7b", size_gb: 4.1, ram_gb: 8}
+  - id: gemma3
+    name: Gemma 3
+    summary: Открытая модель Google.
+    tags:
+      - {tag: "4b", size_gb: 3.3, ram_gb: 6}
+  - id: phi4
+    name: Phi-4
+    summary: Модель Microsoft. Тег 14b тяжёлый для слабых машин.
+    tags:
+      - {tag: "14b", size_gb: 9.1, ram_gb: 16}
+  - id: phi3.5
+    name: Phi-3.5
+    summary: Более лёгкий Phi.
+    tags:
+      - {tag: "3.8b", size_gb: 2.2, ram_gb: 4}
+  - id: deepseek-r1
+    name: DeepSeek R1
+    summary: Модель с длинным рассуждением.
+    tags:
+      - {tag: "7b", size_gb: 4.7, ram_gb: 8}
+      - {tag: "8b", size_gb: 5.2, ram_gb: 8}
+  - id: codellama
+    name: Code Llama
+    summary: Модель Meta для кода.
+    tags:
+      - {tag: "7b", size_gb: 3.8, ram_gb: 8}
+  - id: nomic-embed-text
+    name: Nomic Embed
+    summary: Модель для эмбеддингов, не для чата.
+    tags:
+      - {tag: latest, size_gb: 0.3, ram_gb: 1}

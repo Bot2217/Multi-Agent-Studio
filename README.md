@@ -51,6 +51,8 @@ chmod +x start.sh
 
 По умолчанию роли стоят на бесплатном тарифе Gemini. Другие бесплатные варианты описаны в [каталоге](docs/GUIDE.md#catalog).
 
+Раздел «Локальные модели» ставит [Ollama](https://ollama.com) без прав администратора в папку данных Улья (`%LOCALAPPDATA%\Улей\ollama` на Windows, рядом — на macOS и Linux). Веса лежат в своей папке, её можно сменить в настройках. Если Ollama уже запущен на порту 11434, Улей пользуется им и не останавливает его при выходе. Установленные модели появляются у агентов как «Ollama (локально)» и ничего не стоят.
+
 ## Как обновить
 
 Установленный «Улей» обновляется сам из Releases.
@@ -80,4 +82,4 @@ git pull
 
 ## English
 
-Ulei (“Улей”, Hive) is a local multi-agent studio. Download an installer from [Releases](https://github.com/Bot2217/Multi-Agent-Studio/releases). Windows SmartScreen may say the publisher is unknown. On macOS, right-click the app and choose Open. For development, clone `https://github.com/Bot2217/Multi-Agent-Studio.git` and run `start.bat` or `./start.sh`, then open [http://localhost:8501](http://localhost:8501). The guide is in Russian: [docs/GUIDE.md](docs/GUIDE.md).
+Ulei (“Улей”, Hive) is a local multi-agent studio. Download an installer from [Releases](https://github.com/Bot2217/Multi-Agent-Studio/releases). Windows SmartScreen may say the publisher is unknown. On macOS, right-click the app and choose Open. For development, clone `https://github.com/Bot2217/Multi-Agent-Studio.git` and run `start.bat` or `./start.sh`, then open [http://localhost:8501](http://localhost:8501). The guide is in Russian: [docs/GUIDE.md](docs/GUIDE.md). The «Локальные модели» screen installs Ollama into the app data folder without administrator rights, stores weights beside it, and offers those models to agents for free. A system Ollama already listening on port 11434 is reused and left running.

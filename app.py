@@ -90,7 +90,8 @@ SETTING_DEFAULTS = {
     "shell_timeout": 120,
     "keep_awake": True,
     "keep_display": False,
-    "ollama_base": "http://localhost:11434",
+    "ollama_base": "http://127.0.0.1:11434",
+    "ollama_models_dir": "",
 }
 
 
@@ -562,6 +563,40 @@ def render_keys_card() -> None:
         )
 
 
+def session_runtime():
+    from core.ollama_runtime import OllamaRuntime
+
+    runtime = st.session_state.get("ollama_runtime")
+    custom = str(st.session_state.get("ollama_models_dir") or "").strip()
+    base = str(st.session_state.get("ollama_base") or "http://127.0.0.1:11434").strip()
+    if not isinstance(runtime, OllamaRuntime):
+        runtime = OllamaRuntime(
+            models_dir=Path(custom).expanduser() if custom else None,
+            base_url=base,
+        )
+        st.session_state.ollama_runtime = runtime
+        return runtime
+    runtime.base_url = base.rstrip("/")
+    if custom:
+        runtime.set_models_dir(Path(custom).expanduser())
+    return runtime
+
+
+def local_model_names(cfg: dict) -> list[str]:
+    from core.catalog import provider_of, resolve_model
+
+    pipelines = cfg.get("pipelines") or {}
+    _steps, active = pipeline_steps(cfg, pipelines)
+    catalog = st.session_state.get("model_catalog") or {}
+    names: list[str] = []
+    for agent_id in active:
+        key = st.session_state.agent_overrides.get(agent_id, {}).get("model", "")
+        litellm = resolve_model(str(key), cfg, catalog)
+        if provider_of(litellm) == "ollama" and "/" in litellm:
+            names.append(litellm.split("/", 1)[1])
+    return names
+
+
 def start_run(cfg: dict) -> None:
     task = str(st.session_state.task or "").strip()
     if not task:
@@ -573,6 +608,20 @@ def start_run(cfg: dict) -> None:
     except OSError as exc:
         st.session_state.last_run = {"outcome": "failed", "error": f"Папка недоступна: {exc}"}
         return
+    local_names = local_model_names(cfg)
+    if local_names:
+        runtime = session_runtime()
+        try:
+            with st.spinner("Запускаю локальную модель…"):
+                runtime.ensure_running()
+                for name in local_names:
+                    runtime.warmup(name)
+        except Exception as exc:
+            from core.local_runtime import LocalRuntimeError
+
+            message = exc.message if isinstance(exc, LocalRuntimeError) else str(exc)
+            st.session_state.last_run = {"outcome": "failed", "error": message}
+            return
     persist()
     st.session_state.last_run = None
     st.session_state.job = RunJob(
@@ -770,6 +819,206 @@ def render_agents(cfg: dict, catalog: dict, model_choices: list[str]) -> None:
     st.button("Вернуть как было", type="tertiary", on_click=reset)
 
 
+# ---------- local models ----------
+
+
+class _Transfer:
+    def __init__(self, work) -> None:
+        import threading
+
+        self.message = "Запускаю…"
+        self.completed = 0
+        self.total = 0
+        self.error = ""
+        self.outcome = "running"
+        self._cancel = threading.Event()
+        self._thread = threading.Thread(target=self._run, args=(work,), daemon=True)
+        self._thread.start()
+
+    @property
+    def running(self) -> bool:
+        return self.outcome == "running"
+
+    def cancel(self) -> None:
+        self._cancel.set()
+
+    def progress(self, status: str, completed: int, total: int) -> None:
+        self.message = status or "Скачиваю"
+        self.completed = completed
+        self.total = total
+
+    def _run(self, work) -> None:
+        from core.local_runtime import LocalRuntimeError
+
+        try:
+            work(self.progress, self._cancel.is_set)
+            self.outcome = "cancelled" if self._cancel.is_set() else "ok"
+        except LocalRuntimeError as exc:
+            self.error = exc.message
+            self.outcome = "failed"
+        except Exception as exc:
+            self.error = str(exc) or "Не удалось скачать."
+            self.outcome = "failed"
+
+
+def render_local() -> None:
+    from core.local_runtime import (
+        MESSAGES,
+        assess_fit,
+        default_models_dir,
+        format_bytes,
+        load_library,
+    )
+    from core.ollama_runtime import asset_name
+
+    runtime = session_runtime()
+    probe = runtime.probe()
+    page_head(
+        "Локальные модели",
+        "Ollama на этом компьютере",
+        "Веса и сама программа живут в папке Улья. Ключ API не нужен.",
+    )
+    if probe.running:
+        who = "уже был запущен, Улей его не остановит" if probe.external else "запущен Ульем"
+        status_line("ok", "Ollama работает", who)
+    elif probe.error:
+        status_line("bad", "Ollama", MESSAGES.get(probe.error, probe.error))
+    elif probe.binary:
+        status_line("live", "Ollama установлен", "сервер выключен — запустится вместе с ульем")
+    else:
+        status_line("bad", "Ollama не установлен", "скачается без прав администратора")
+    if probe.gpu_note:
+        st.caption(probe.gpu_note)
+
+    custom = str(st.session_state.get("ollama_models_dir") or "").strip()
+    models_path = Path(custom).expanduser() if custom else default_models_dir()
+    free = runtime.disk_free()
+    ram = runtime.ram_free()
+    st.caption(
+        f"Папка весов: {models_path}. Свободно на диске {format_bytes(free)}"
+        + (f", памяти {format_bytes(ram)}." if ram is not None else ".")
+    )
+
+    job = st.session_state.get("local_job")
+    if job is not None and job.running:
+
+        @st.fragment(run_every=0.6)
+        def live_transfer() -> None:
+            current = st.session_state.get("local_job")
+            if current is None:
+                return
+            if not current.running:
+                st.rerun()
+            ratio = 0.0
+            if current.total:
+                ratio = min(1.0, current.completed / current.total)
+            st.progress(ratio, text=current.message or "Скачиваю…")
+            st.button("Отменить", on_click=current.cancel, key="cancel_local")
+
+        live_transfer()
+    elif job is not None and job.error:
+        st.error(job.error)
+
+    if not probe.running and not (job and job.running) and probe.error != "port_busy":
+        if probe.binary:
+            if st.button("Запустить Ollama", type="primary"):
+                try:
+                    runtime.ensure_running()
+                except Exception as exc:
+                    st.error(getattr(exc, "message", str(exc)))
+                else:
+                    st.rerun()
+        elif st.button("Установить Ollama", type="primary"):
+            try:
+                asset_name()
+            except Exception as exc:
+                st.error(str(exc))
+            else:
+
+                def work(progress, cancel):
+                    runtime.install(progress, cancel)
+                    runtime.ensure_running()
+
+                st.session_state.local_job = _Transfer(work)
+                st.rerun()
+
+    installed = []
+    if probe.running:
+        try:
+            installed = runtime.installed_models()
+        except Exception as exc:
+            st.error(str(exc))
+    st.subheader("Уже скачаны")
+    if not installed:
+        empty("Пока пусто. Выберите модель ниже и нажмите «Установить».")
+    else:
+        for model in installed:
+            row, action = st.columns([4, 1], vertical_alignment="center")
+            row.markdown(f"**{html.escape(model.name)}** · {format_bytes(model.size_bytes)}")
+            if action.button("Удалить", key=f"del_{model.name}"):
+                try:
+                    runtime.delete_model(model.name)
+                    st.toast(f"{model.name} удалена")
+                    st.rerun()
+                except Exception as exc:
+                    st.error(str(exc))
+
+    library = st.session_state.get("ollama_library")
+    if library is None:
+        cache = runtime.home / "library.html"
+
+        def fetch() -> str:
+            from urllib.request import Request, urlopen
+
+            request = Request("https://ollama.com/library", headers={"User-Agent": "ulei"})
+            with urlopen(request, timeout=4) as response:
+                return response.read().decode("utf-8", errors="replace")
+
+        library = load_library(fetch=fetch, cache=cache)
+        st.session_state.ollama_library = library
+    st.subheader("Каталог")
+    st.caption("Размеры ориентировочные. Список с ollama.com подмешивается, если сайт открылся.")
+    for model in library:
+        with st.container(border=True):
+            st.markdown(f"**{html.escape(model.name)}**")
+            if model.summary:
+                st.caption(model.summary)
+            tags = [item.tag for item in model.tags] or ["latest"]
+            tag = st.selectbox(
+                "Тег", tags, key=f"tag_{model.model_id}", label_visibility="collapsed"
+            )
+            chosen = next((item for item in model.tags if item.tag == tag), model.tags[0])
+            fit = assess_fit(chosen.size_bytes, free, chosen.ram_bytes, ram)
+            detail = format_bytes(chosen.size_bytes)
+            if chosen.ram_bytes:
+                detail += f" · памяти около {format_bytes(chosen.ram_bytes)}"
+            st.caption(detail)
+            if fit.message:
+                st.warning(fit.message)
+            allow = True
+            if fit.disk_ok and not fit.ram_ok:
+                allow = st.checkbox("Всё равно скачать", key=f"anyway_{model.model_id}")
+            reference = model.reference(tag)
+            busy = bool(job and job.running)
+            if st.button(
+                "Установить",
+                key=f"pull_{model.model_id}",
+                disabled=busy or not fit.disk_ok or not allow or not probe.running,
+            ):
+
+                def work(progress, cancel, name=reference):
+                    runtime.pull(name, progress, cancel)
+
+                st.session_state.local_job = _Transfer(work)
+                st.rerun()
+            if not probe.running:
+                st.caption("Сначала нужен запущенный Ollama.")
+
+    with st.expander("Журнал Ollama"):
+        text = runtime.log_tail() or "Журнал появится, когда Улей сам запустит сервер."
+        st.code(text, language="text")
+
+
 # ---------- models ----------
 
 
@@ -965,8 +1214,19 @@ def render_settings() -> None:
         st.text_input,
         "Адрес Ollama",
         "ollama_base",
-        help="Нужен только для локальных моделей.",
+        help="Нужен только для локальных моделей. Обычно http://127.0.0.1:11434.",
     )
+    from core.local_runtime import default_models_dir
+
+    custom = str(st.session_state.get("ollama_models_dir") or "").strip()
+    models_path = Path(custom).expanduser() if custom else default_models_dir()
+    bound(
+        st.text_input,
+        "Папка моделей Ollama",
+        "ollama_models_dir",
+        help="Пусто — папка внутри данных Улья. Действует, когда Улей сам запускает Ollama.",
+    )
+    st.caption(f"Сейчас веса лежат в {models_path}")
 
     with st.expander("Проверить SSH-подключение"):
         render_ssh()
@@ -1012,8 +1272,9 @@ def render_help() -> None:
 **С чего начать.** Получите бесплатный ключ в Google AI Studio или OpenRouter, вставьте его выше
 и сохраните. Затем откройте «Запуск», опишите задачу и нажмите «Запустить».
 
-**Локальные модели.** Установите [Ollama](https://ollama.com/library), скачайте веса
-(`ollama pull gemma4`) и выберите модель с пометкой Local в разделе «Агенты». Ключ не нужен.
+**Локальные модели.** Откройте раздел «Локальные модели». Если Ollama ещё нет,
+Улей скачает его в свою папку без прав администратора. Уже запущенный на порту 11434
+не трогаем. Скачанные модели в «Агентах» называются «Ollama (локально)» и бесплатны.
 
 **Где что лежит**
 
@@ -1041,9 +1302,26 @@ def main() -> None:
     st.set_page_config(page_title="Улей", page_icon="⬡", layout="wide")
     config_path = ROOT / "config" / "agents.yaml"
     cfg = load_config(config_path) if config_path.exists() else {}
+    user_set = load_user_settings()
     catalog = load_models_catalog()
+    try:
+        from core.local_runtime import installed_catalog
+        from core.ollama_runtime import OllamaRuntime
+
+        custom = str(user_set.get("ollama_models_dir") or "").strip()
+        base = str(user_set.get("ollama_base") or "http://127.0.0.1:11434")
+        runtime = OllamaRuntime(
+            models_dir=Path(custom).expanduser() if custom else None,
+            base_url=base,
+        )
+        st.session_state.ollama_runtime = runtime
+        if runtime.probe().running:
+            catalog = {**catalog, **installed_catalog(runtime.installed_models())}
+    except Exception:
+        pass
     model_choices = sorted_model_keys(runnable_models(catalog)) or ["gemini_38_flash"]
-    init_state(cfg, load_user_settings(), model_choices)
+    init_state(cfg, user_set, model_choices)
+    st.session_state.model_catalog = catalog
     st.markdown(
         theme_stylesheet(st.session_state.theme, st.session_state.palette), unsafe_allow_html=True
     )
@@ -1054,6 +1332,8 @@ def main() -> None:
         render_agents(cfg, catalog, model_choices)
     elif screen == "models":
         render_models(catalog)
+    elif screen == "local":
+        render_local()
     elif screen == "files":
         render_files()
     elif screen == "settings":
