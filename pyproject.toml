@@ -1,3 +1,20 @@
+[project]
+name = "ulei"
+version = "0.1.0"
+description = "Улей — многоагентная студия"
+readme = "README.md"
+license = "AGPL-3.0-or-later"
+authors = [{ name = "Bot2217" }]
+requires-python = ">=3.12"
+dependencies = [
+  "streamlit>=1.40.0",
+  "litellm>=1.50.0",
+  "python-dotenv>=1.0.0",
+  "wakepy>=0.9.0",
+  "paramiko>=3.0.0",
+  "pyyaml>=6.0",
+]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]

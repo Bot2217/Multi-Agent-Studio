@@ -90,6 +90,10 @@ git pull
 - [Настройки](docs/GUIDE.md#settings)
 - [Разработка и CI](docs/GUIDE.md#dev)
 
+## Лицензия
+
+Ядро программы открыто на условиях [GNU AGPL-3.0](LICENSE) или любой более поздней версии. Коммерческие лицензии и «Улей Pro» можно получить у автора, Bot2217. Вклад в код возможен после подписи [CLA](CLA.md): как это сделать, написано в [CONTRIBUTING.md](CONTRIBUTING.md).
+
 ## English
 
-Ulei (“Улей”, Hive) is a local multi-agent studio. Download an installer from [Releases](https://github.com/Bot2217/Multi-Agent-Studio/releases). Windows SmartScreen may say the publisher is unknown. On macOS, if Gatekeeper says the app is damaged, run `xattr -cr "/Applications/Улей.app"` or right-click the app and choose Open. For development, clone `https://github.com/Bot2217/Multi-Agent-Studio.git` and run `start.bat` or `./start.sh`, then open [http://localhost:8501](http://localhost:8501). The guide is in Russian: [docs/GUIDE.md](docs/GUIDE.md). The «Локальные модели» screen installs Ollama into the app data folder without administrator rights, stores weights beside it, and offers those models to agents for free. A system Ollama already listening on port 11434 is reused and left running.
+Ulei (“Улей”, Hive) is a local multi-agent studio. Download an installer from [Releases](https://github.com/Bot2217/Multi-Agent-Studio/releases). Windows SmartScreen may say the publisher is unknown. On macOS, if Gatekeeper says the app is damaged, run `xattr -cr "/Applications/Улей.app"` or right-click the app and choose Open. For development, clone `https://github.com/Bot2217/Multi-Agent-Studio.git` and run `start.bat` or `./start.sh`, then open [http://localhost:8501](http://localhost:8501). The guide is in Russian: [docs/GUIDE.md](docs/GUIDE.md). The «Локальные модели» screen installs Ollama into the app data folder without administrator rights, stores weights beside it, and offers those models to agents for free. A system Ollama already listening on port 11434 is reused and left running. The core is AGPL-3.0-or-later. Commercial licenses and Ulei Pro are available from Bot2217. Contributions require the CLA in CLA.md.
