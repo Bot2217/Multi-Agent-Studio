@@ -3,6 +3,7 @@ name = "ulei"
 version = "0.1.0"
 description = "Улей — многоагентная студия"
 authors = ["Bot2217"]
+license = "AGPL-3.0-or-later"
 edition = "2021"
 
 [lib]
