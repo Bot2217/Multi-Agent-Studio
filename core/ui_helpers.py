@@ -6,10 +6,11 @@ from datetime import datetime
 from pathlib import Path
 
 from core.catalog import KEY_ENV
+from core.paths import data_root
 
-ROOT = Path(__file__).resolve().parent.parent
-ENV_PATH = ROOT / ".env"
-SETTINGS_PATH = ROOT / "user_settings.json"
+_DATA = data_root()
+ENV_PATH = _DATA / ".env"
+SETTINGS_PATH = _DATA / "user_settings.json"
 
 KEY_NAMES = list(dict.fromkeys(KEY_ENV.values()))
 

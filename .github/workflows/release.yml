@@ -1,0 +1,87 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  pull_request:
+    paths:
+      - "desktop/**"
+      - "app.py"
+      - "core/**"
+      - "tools/**"
+      - "config/**"
+      - "requirements.txt"
+      - ".github/workflows/release.yml"
+
+jobs:
+  smoke:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Linux packages for Tauri
+        run: bash desktop/ci-apt.sh
+      - name: Freeze the Python sidecar
+        run: bash desktop/build-backend.sh
+      - name: Install the desktop shell
+        working-directory: desktop
+        run: npm install
+      - name: Build an AppImage
+        working-directory: desktop
+        run: npm run tauri build -- --bundles appimage
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            bundles: appimage,deb
+          - os: windows-latest
+            bundles: nsis,msi
+          - os: macos-latest
+            bundles: dmg
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Linux packages for Tauri
+        if: matrix.os == 'ubuntu-latest'
+        run: bash desktop/ci-apt.sh
+      - name: Freeze the Python sidecar
+        run: bash desktop/build-backend.sh
+      - name: Put the updater public key into the build
+        env:
+          TAURI_SIGNING_PUBLIC_KEY: ${{ secrets.TAURI_SIGNING_PUBLIC_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+        run: python3 desktop/inject_updater_key.py
+      - name: Publish a draft release
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          projectPath: desktop
+          tagName: ${{ github.ref_name }}
+          releaseName: Улей ${{ github.ref_name }}
+          releaseBody: |
+            Установщики «Улей». Черновик не виден автообновлению, пока релиз не опубликован.
+            Без секретов TAURI_SIGNING_* подписи и latest.json нет.
+          releaseDraft: true
+          prerelease: false
+          args: --bundles ${{ matrix.bundles }}

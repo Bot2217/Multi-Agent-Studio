@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import os
+
 from core.icons import icon_css
 
 DEFAULT_THEME = "auto"
@@ -262,6 +264,16 @@ FONT_IMPORT = (
 )
 
 
+def _desktop_css() -> str:
+    if os.environ.get("MAS_DESKTOP") != "1":
+        return ""
+    return """
+header[data-testid="stHeader"], [data-testid="stToolbar"], [data-testid="stDecoration"],
+#MainMenu, footer, [data-testid="stStatusWidget"] { display: none !important; }
+.block-container { padding-top: 1.1rem; }
+"""
+
+
 def theme_stylesheet(theme_id: str | None, palette: str | None = None) -> str:
     choice = resolve_theme(theme_id)
     pair = PALETTES[resolve_palette(palette)]
@@ -279,7 +291,7 @@ def theme_stylesheet(theme_id: str | None, palette: str | None = None) -> str:
     )
     return (
         f"<style>\n{FONT_IMPORT}\n/* theme:{choice} palette:{resolve_palette(palette)} */\n"
-        f"{colors}\n{_BASE_CSS}\n{icon_css()}\n{badge_css}\n</style>"
+        f"{colors}\n{_BASE_CSS}\n{icon_css()}\n{badge_css}\n{_desktop_css()}\n</style>"
     )
 
 
