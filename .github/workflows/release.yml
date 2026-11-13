@@ -25,6 +25,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
       - uses: dtolnay/rust-toolchain@stable
       - name: Linux packages for Tauri
         run: bash desktop/ci-apt.sh
@@ -32,7 +34,7 @@ jobs:
         run: bash desktop/build-backend.sh
       - name: Install the desktop shell
         working-directory: desktop
-        run: npm install
+        run: npm ci
       - name: Build an AppImage
         working-directory: desktop
         run: npm run tauri build -- --bundles appimage
@@ -50,6 +52,8 @@ jobs:
           - os: macos-latest
             bundles: dmg
     runs-on: ${{ matrix.os }}
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -58,12 +62,17 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
       - uses: dtolnay/rust-toolchain@stable
       - name: Linux packages for Tauri
         if: matrix.os == 'ubuntu-latest'
         run: bash desktop/ci-apt.sh
       - name: Freeze the Python sidecar
         run: bash desktop/build-backend.sh
+      - name: Install the desktop shell
+        working-directory: desktop
+        run: npm ci
       - name: Put the updater public key into the build
         env:
           TAURI_SIGNING_PUBLIC_KEY: ${{ secrets.TAURI_SIGNING_PUBLIC_KEY }}
