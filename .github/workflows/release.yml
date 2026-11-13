@@ -50,7 +50,7 @@ jobs:
           - os: windows-latest
             bundles: nsis,msi
           - os: macos-latest
-            bundles: dmg
+            bundles: app,dmg
     runs-on: ${{ matrix.os }}
     permissions:
       contents: write
@@ -77,7 +77,7 @@ jobs:
         env:
           TAURI_SIGNING_PUBLIC_KEY: ${{ secrets.TAURI_SIGNING_PUBLIC_KEY }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-        run: python3 desktop/inject_updater_key.py
+        run: python3 desktop/inject_updater_key.py --require
       - name: Publish a draft release
         uses: tauri-apps/tauri-action@v0
         env:
@@ -89,8 +89,9 @@ jobs:
           tagName: ${{ github.ref_name }}
           releaseName: Улей ${{ github.ref_name }}
           releaseBody: |
-            Установщики «Улей». Черновик не виден автообновлению, пока релиз не опубликован.
-            Без секретов TAURI_SIGNING_* подписи и latest.json нет.
+            Установщики «Улей». Файлы релиза называются Ulei_. Черновик не виден автообновлению, пока релиз не опубликован.
           releaseDraft: true
           prerelease: false
+          updaterJsonPreferNsis: true
+          assetNamePattern: "Ulei_[version]_[arch][setup][ext]"
           args: --bundles ${{ matrix.bundles }}
