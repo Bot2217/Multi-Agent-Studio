@@ -11,9 +11,13 @@ if [[ -z "$HOST" ]]; then
 fi
 SEP=":"
 EXT=""
+CODESIGN=()
 case "$HOST" in
   *windows*) SEP=";"; EXT=".exe" ;;
 esac
+if [[ "$(uname -s)" == "Darwin" ]]; then
+  CODESIGN=(--codesign-identity - --osx-entitlements-file desktop/src-tauri/entitlements.plist)
+fi
 pyinstaller --noconfirm --clean --onefile --name ulei-backend \
   --collect-all streamlit \
   --collect-all litellm \
@@ -24,8 +28,16 @@ pyinstaller --noconfirm --clean --onefile --name ulei-backend \
   --add-data "config${SEP}config" \
   --add-data "tools${SEP}tools" \
   --add-data ".streamlit${SEP}.streamlit" \
+  ${CODESIGN[@]+"${CODESIGN[@]}"} \
   desktop/backend_entry.py
 mkdir -p desktop/src-tauri/binaries
-cp "dist/ulei-backend${EXT}" "desktop/src-tauri/binaries/ulei-backend-${HOST}${EXT}"
-chmod +x "desktop/src-tauri/binaries/ulei-backend-${HOST}${EXT}" || true
-echo "sidecar desktop/src-tauri/binaries/ulei-backend-${HOST}${EXT}"
+SIDECAR="desktop/src-tauri/binaries/ulei-backend-${HOST}${EXT}"
+cp "dist/ulei-backend${EXT}" "$SIDECAR"
+chmod +x "$SIDECAR" || true
+if [[ "$(uname -s)" == "Darwin" ]]; then
+  codesign --force --sign - --timestamp=none \
+    --entitlements desktop/src-tauri/entitlements.plist \
+    "$SIDECAR"
+  codesign --verify --strict --verbose=2 "$SIDECAR"
+fi
+echo "sidecar $SIDECAR"

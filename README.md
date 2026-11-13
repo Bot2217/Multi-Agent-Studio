@@ -11,8 +11,18 @@
 Готовые сборки: [Releases](https://github.com/Bot2217/Multi-Agent-Studio/releases). Браузер не нужен.
 
 - Windows: установщик `.exe` (и `.msi`). SmartScreen может написать «неизвестный издатель» — «Подробнее», затем «Выполнить в любом случае».
-- macOS: `.dmg`. Если система не открывает файл, правый клик по «Улей» → «Открыть».
+- macOS: `.dmg`. Сборка подписана ad-hoc, без аккаунта Apple Developer.
 - Linux: `.AppImage` или `.deb`.
+
+### macOS: «приложение повреждено»
+
+Gatekeeper может написать, что «Улей.app» повреждено. Тогда в Терминале:
+
+```bash
+xattr -cr "/Applications/Улей.app"
+```
+
+или правый клик по приложению → «Открыть».
 
 При запуске «Улей» проверяет обновление. Если оно есть, появится «Доступно обновление» с кнопкой «Установить и перезапустить». Как устроены ключ подписи и первый тег — в [установке](docs/GUIDE.md#desktop).
 
@@ -82,4 +92,4 @@ git pull
 
 ## English
 
-Ulei (“Улей”, Hive) is a local multi-agent studio. Download an installer from [Releases](https://github.com/Bot2217/Multi-Agent-Studio/releases). Windows SmartScreen may say the publisher is unknown. On macOS, right-click the app and choose Open. For development, clone `https://github.com/Bot2217/Multi-Agent-Studio.git` and run `start.bat` or `./start.sh`, then open [http://localhost:8501](http://localhost:8501). The guide is in Russian: [docs/GUIDE.md](docs/GUIDE.md). The «Локальные модели» screen installs Ollama into the app data folder without administrator rights, stores weights beside it, and offers those models to agents for free. A system Ollama already listening on port 11434 is reused and left running.
+Ulei (“Улей”, Hive) is a local multi-agent studio. Download an installer from [Releases](https://github.com/Bot2217/Multi-Agent-Studio/releases). Windows SmartScreen may say the publisher is unknown. On macOS, if Gatekeeper says the app is damaged, run `xattr -cr "/Applications/Улей.app"` or right-click the app and choose Open. For development, clone `https://github.com/Bot2217/Multi-Agent-Studio.git` and run `start.bat` or `./start.sh`, then open [http://localhost:8501](http://localhost:8501). The guide is in Russian: [docs/GUIDE.md](docs/GUIDE.md). The «Локальные модели» screen installs Ollama into the app data folder without administrator rights, stores weights beside it, and offers those models to agents for free. A system Ollama already listening on port 11434 is reused and left running.

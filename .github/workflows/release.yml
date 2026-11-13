@@ -39,6 +39,33 @@ jobs:
         working-directory: desktop
         run: npm run tauri build -- --bundles appimage
 
+  macos-sign:
+    if: github.event_name == 'pull_request'
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Freeze the Python sidecar
+        run: bash desktop/build-backend.sh
+      - name: Install the desktop shell
+        working-directory: desktop
+        run: npm ci
+      - name: Build the signed app
+        working-directory: desktop
+        env:
+          APPLE_SIGNING_IDENTITY: "-"
+        run: npm run tauri build -- --bundles app
+      - name: Verify the ad-hoc signature
+        run: bash desktop/verify-macos-sign.sh
+
   release:
     if: startsWith(github.ref, 'refs/tags/v')
     strategy:
@@ -78,6 +105,9 @@ jobs:
           TAURI_SIGNING_PUBLIC_KEY: ${{ secrets.TAURI_SIGNING_PUBLIC_KEY }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
         run: python3 desktop/inject_updater_key.py --require
+      - name: Use an ad-hoc Apple signing identity
+        if: matrix.os == 'macos-latest'
+        run: echo 'APPLE_SIGNING_IDENTITY=-' >> "$GITHUB_ENV"
       - name: Publish a draft release
         uses: tauri-apps/tauri-action@v0
         env:
@@ -90,8 +120,14 @@ jobs:
           releaseName: Улей ${{ github.ref_name }}
           releaseBody: |
             Установщики «Улей». Файлы релиза называются Ulei_. Черновик не виден автообновлению, пока релиз не опубликован.
+            macOS: если пишет «повреждено» — выполните `xattr -cr "/Applications/Улей.app"` или правый клик → Открыть.
           releaseDraft: true
           prerelease: false
           updaterJsonPreferNsis: true
           assetNamePattern: "Ulei_[version]_[arch][setup][ext]"
           args: --bundles ${{ matrix.bundles }}
+      - name: Verify the ad-hoc signature
+        if: matrix.os == 'macos-latest'
+        env:
+          REQUIRE_UPDATER_ARCHIVE: "1"
+        run: bash desktop/verify-macos-sign.sh
