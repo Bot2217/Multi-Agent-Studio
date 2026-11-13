@@ -48,7 +48,7 @@
   },
   "plugins": {
     "updater": {
-      "pubkey": "REPLACE_ME",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEFEMTk0QTIwODRGQTFBMjIKUldRaUd2cUVJRW9acmVUb0crR1R6U25Nc3g1OW14alcxSFU5blVWcmZqUmZEdzNJUnRBL0RFKy8K",
       "endpoints": [
         "https://github.com/Bot2217/Multi-Agent-Studio/releases/latest/download/latest.json"
       ]
