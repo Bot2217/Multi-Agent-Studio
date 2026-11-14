@@ -8,7 +8,6 @@
     "dialog:default",
     "process:default",
     "updater:default",
-    "allow-engine-health",
     {
       "identifier": "shell:allow-spawn",
       "allow": [

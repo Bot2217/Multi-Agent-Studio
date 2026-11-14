@@ -8,7 +8,6 @@ use tauri_plugin_shell::ShellExt;
 use tauri_plugin_updater::UpdaterExt;
 
 struct Backend(Mutex<Option<CommandChild>>);
-struct EngineHealth(Mutex<(u16, bool)>);
 
 const RU_JSON: &str = include_str!("../../../locales/ru.json");
 const EN_JSON: &str = include_str!("../../../locales/en.json");
@@ -130,16 +129,6 @@ fn wait_until_ready(port: u16, api_port: u16) -> (bool, bool) {
     (page_ok, engine_ok)
 }
 
-#[tauri::command]
-fn engine_health(state: tauri::State<'_, EngineHealth>) -> serde_json::Value {
-    let (port, healthy) = state.0.lock().map(|slot| *slot).unwrap_or((0, false));
-    serde_json::json!({
-        "port": port,
-        "ok": healthy,
-        "health": format!("http://127.0.0.1:{port}/api/v1/health"),
-    })
-}
-
 fn set_status(window: &tauri::WebviewWindow, text: &str) {
     let quoted = serde_json::to_string(text).unwrap_or_else(|_| "\"\"".into());
     let _ = window.eval(&format!(
@@ -226,11 +215,6 @@ fn boot(app: tauri::AppHandle) {
     };
     app.manage(Backend(Mutex::new(Some(child))));
     let (page_ok, engine_ok) = wait_until_ready(port, api_port);
-    if let Some(state) = app.try_state::<EngineHealth>() {
-        if let Ok(mut slot) = state.0.lock() {
-            *slot = (api_port, engine_ok);
-        }
-    }
     if !page_ok {
         if let Some(window) = app.get_webview_window("main") {
             set_status(&window, &tr("desktop.no_answer"));
@@ -300,9 +284,7 @@ pub fn run() {
         }));
     }
     builder
-        .invoke_handler(tauri::generate_handler![engine_health])
         .setup(|app| {
-            app.manage(EngineHealth(Mutex::new((0, false))));
             let handle = app.handle().clone();
             std::thread::spawn(move || boot(handle));
             watch_signals(app.handle().clone());
