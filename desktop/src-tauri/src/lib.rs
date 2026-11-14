@@ -88,23 +88,45 @@ fn free_port() -> u16 {
     port
 }
 
-fn wait_until_ready(port: u16) -> bool {
-    let url = format!("http://127.0.0.1:{port}/_stcore/health");
+fn probe(client: &reqwest::blocking::Client, url: &str) -> bool {
+    client
+        .get(url)
+        .send()
+        .map(|response| response.status().is_success())
+        .unwrap_or(false)
+}
+
+/// Streamlit health, then the engine health. The window still opens when the
+/// engine stays quiet, after a short extra wait.
+fn wait_until_ready(port: u16, api_port: u16) -> (bool, bool) {
+    let page = format!("http://127.0.0.1:{port}/_stcore/health");
+    let engine = format!("http://127.0.0.1:{api_port}/api/v1/health");
     let Ok(client) = reqwest::blocking::Client::builder()
         .timeout(Duration::from_secs(2))
         .build()
     else {
-        return false;
+        return (false, false);
     };
-    for _ in 0..120 {
-        if let Ok(response) = client.get(&url).send() {
-            if response.status().is_success() {
-                return true;
-            }
+    let mut page_ok = false;
+    let mut engine_ok = false;
+    let mut page_since: Option<u32> = None;
+    for tick in 0..120u32 {
+        if !page_ok && probe(&client, &page) {
+            page_ok = true;
+            page_since = Some(tick);
+        }
+        if !engine_ok && probe(&client, &engine) {
+            engine_ok = true;
+        }
+        if page_ok && engine_ok {
+            return (true, true);
+        }
+        if page_ok && page_since.is_some_and(|start| tick.saturating_sub(start) >= 15) {
+            return (true, false);
         }
         std::thread::sleep(Duration::from_secs(1));
     }
-    false
+    (page_ok, engine_ok)
 }
 
 fn set_status(window: &tauri::WebviewWindow, text: &str) {
@@ -114,12 +136,21 @@ fn set_status(window: &tauri::WebviewWindow, text: &str) {
     ));
 }
 
-fn spawn_backend(app: &tauri::AppHandle, port: u16) -> Result<CommandChild, String> {
+fn spawn_backend(
+    app: &tauri::AppHandle,
+    port: u16,
+    api_port: u16,
+) -> Result<CommandChild, String> {
     let sidecar = app
         .shell()
         .sidecar("ulei-backend")
         .map_err(|err| err.to_string())?
-        .args(["--port", &port.to_string()])
+        .args([
+            "--port",
+            &port.to_string(),
+            "--api-port",
+            &api_port.to_string(),
+        ])
         .set_process_group(true);
     let (mut rx, child) = sidecar.spawn().map_err(|err| err.to_string())?;
     tauri::async_runtime::spawn(async move {
@@ -171,7 +202,8 @@ fn boot(app: tauri::AppHandle) {
         set_status(&window, &tr("desktop.starting"));
     }
     let port = free_port();
-    let child = match spawn_backend(&app, port) {
+    let api_port = free_port();
+    let child = match spawn_backend(&app, port, api_port) {
         Ok(child) => child,
         Err(err) => {
             eprintln!("sidecar: {err}");
@@ -182,14 +214,18 @@ fn boot(app: tauri::AppHandle) {
         }
     };
     app.manage(Backend(Mutex::new(Some(child))));
-    if !wait_until_ready(port) {
+    let (page_ok, engine_ok) = wait_until_ready(port, api_port);
+    if !page_ok {
         if let Some(window) = app.get_webview_window("main") {
-            set_status(
-                &window,
-                &tr("desktop.no_answer"),
-            );
+            set_status(&window, &tr("desktop.no_answer"));
         }
         return;
+    }
+    if !engine_ok {
+        eprintln!("engine healthcheck failed on {api_port}");
+        if let Some(window) = app.get_webview_window("main") {
+            set_status(&window, &tr("desktop.engine_down"));
+        }
     }
     if let Some(window) = app.get_webview_window("main") {
         let url = format!("http://127.0.0.1:{port}/");

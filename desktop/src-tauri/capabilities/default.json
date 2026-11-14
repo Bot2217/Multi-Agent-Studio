@@ -14,7 +14,12 @@
         {
           "name": "ulei-backend",
           "sidecar": true,
-          "args": ["--port", { "validator": "\\d{1,5}" }]
+          "args": [
+            "--port",
+            { "validator": "\\d{1,5}" },
+            "--api-port",
+            { "validator": "\\d{1,5}" }
+          ]
         }
       ]
     }
