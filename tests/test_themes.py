@@ -2,7 +2,7 @@ from core.themes import (
     DEFAULT_PALETTE,
     DEFAULT_THEME,
     PALETTES,
-    SCREENS,
+    SCREEN_IDS,
     THEME_ORDER,
     contrast_issues,
     resolve_palette,
@@ -68,7 +68,11 @@ def test_stylesheet_per_choice():
 
 
 def test_screens():
-    assert SCREENS[0] == ("run", "Запуск")
+    from core.i18n import set_language, t
+
+    assert SCREEN_IDS[0] == "run"
+    set_language("ru")
+    assert t("nav.run") == "Запуск"
     assert resolve_screen("models") == "models"
     assert resolve_screen("nope") == "run"
     assert resolve_screen("ssh") == "settings"

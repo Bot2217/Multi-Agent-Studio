@@ -13,7 +13,9 @@ def _parse_port(argv: list[str]) -> str:
         if index + 1 < len(argv):
             port = argv[index + 1].strip()
     if not port.isdigit():
-        raise SystemExit("Нужен порт: --port 12345")
+        from core.i18n import t
+
+        raise SystemExit(t("shell.port_required"))
     return port
 
 
@@ -25,7 +27,9 @@ def main() -> None:
     data = data_root()
     copied = migrate_user_files(data)
     if copied:
-        print("Перенесены файлы: " + ", ".join(copied), flush=True)
+        from core.i18n import t
+
+        print(t("shell.migrated", names=", ".join(copied)), flush=True)
 
     os.environ["MAS_DESKTOP"] = "1"
     os.environ["MAS_DATA_DIR"] = str(data)

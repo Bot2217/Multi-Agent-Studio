@@ -66,7 +66,7 @@ def save_user_settings(data):
 def preset_paths(default_ws):
     home = Path.home()
     candidates = [
-        ("Проект", Path(default_ws)),
+        ("project", Path(default_ws)),
         ("Home", home),
         ("Desktop", home / "Desktop"),
         ("Documents", home / "Documents"),
@@ -74,7 +74,7 @@ def preset_paths(default_ws):
     ]
     items = []
     for label, path in candidates:
-        if label == "Проект" or path.exists():
+        if label == "project" or path.exists():
             items.append((label, path))
     for name in ("OneDrive/Desktop", "OneDrive/Рабочий стол"):
         path = home / Path(name)

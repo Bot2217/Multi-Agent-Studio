@@ -9,6 +9,78 @@ use tauri_plugin_updater::UpdaterExt;
 
 struct Backend(Mutex<Option<CommandChild>>);
 
+const RU_JSON: &str = include_str!("../../../locales/ru.json");
+const EN_JSON: &str = include_str!("../../../locales/en.json");
+
+fn saved_language() -> Option<&'static str> {
+    let mut paths = Vec::new();
+    if let Ok(dir) = std::env::var("MAS_DATA_DIR") {
+        paths.push(std::path::PathBuf::from(dir).join("user_settings.json"));
+    }
+    if let Ok(appdata) = std::env::var("APPDATA") {
+        paths.push(
+            std::path::PathBuf::from(appdata)
+                .join("ulei")
+                .join("user_settings.json"),
+        );
+    }
+    if let Some(home) = std::env::var_os("HOME") {
+        let home = std::path::PathBuf::from(home);
+        paths.push(
+            home.join("Library")
+                .join("Application Support")
+                .join("ulei")
+                .join("user_settings.json"),
+        );
+        paths.push(
+            home.join(".local")
+                .join("share")
+                .join("ulei")
+                .join("user_settings.json"),
+        );
+    }
+    paths.push(std::path::PathBuf::from("user_settings.json"));
+    for path in paths {
+        let Ok(text) = std::fs::read_to_string(path) else {
+            continue;
+        };
+        let Ok(value) = serde_json::from_str::<serde_json::Value>(&text) else {
+            continue;
+        };
+        match value.get("language").and_then(|item| item.as_str()) {
+            Some("ru") => return Some("ru"),
+            Some("en") => return Some("en"),
+            _ => {}
+        }
+    }
+    None
+}
+
+fn ui_language() -> &'static str {
+    if let Some(lang) = saved_language() {
+        return lang;
+    }
+    let raw = std::env::var("LC_ALL")
+        .or_else(|_| std::env::var("LANG"))
+        .unwrap_or_default();
+    if raw.to_lowercase().starts_with("en") {
+        "en"
+    } else {
+        "ru"
+    }
+}
+
+fn tr(key: &str) -> String {
+    fn lookup(raw: &str, key: &str) -> Option<String> {
+        let value: serde_json::Value = serde_json::from_str(raw).ok()?;
+        value.get(key).and_then(|item| item.as_str()).map(str::to_string)
+    }
+    let primary = if ui_language() == "en" { EN_JSON } else { RU_JSON };
+    lookup(primary, key)
+        .or_else(|| lookup(RU_JSON, key))
+        .unwrap_or_else(|| key.to_string())
+}
+
 fn free_port() -> u16 {
     let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("free port");
     let port = listener.local_addr().expect("port").port();
@@ -78,11 +150,11 @@ fn offer_update(app: &tauri::AppHandle) {
         };
         let install = handle
             .dialog()
-            .message("Доступно обновление. Установить и перезапустить?")
+            .message(tr("desktop.update_message"))
             .title("Улей")
             .buttons(MessageDialogButtons::OkCancelCustom(
-                "Установить и перезапустить".into(),
-                "Позже".into(),
+                tr("desktop.update_install"),
+                tr("desktop.update_later"),
             ))
             .blocking_show();
         if !install {
@@ -95,13 +167,16 @@ fn offer_update(app: &tauri::AppHandle) {
 }
 
 fn boot(app: tauri::AppHandle) {
+    if let Some(window) = app.get_webview_window("main") {
+        set_status(&window, &tr("desktop.starting"));
+    }
     let port = free_port();
     let child = match spawn_backend(&app, port) {
         Ok(child) => child,
         Err(err) => {
             eprintln!("sidecar: {err}");
             if let Some(window) = app.get_webview_window("main") {
-                set_status(&window, "Не удалось запустить Улей.");
+                set_status(&window, &tr("desktop.start_failed"));
             }
             return;
         }
@@ -111,7 +186,7 @@ fn boot(app: tauri::AppHandle) {
         if let Some(window) = app.get_webview_window("main") {
             set_status(
                 &window,
-                "Улей не ответил. Закройте окно и запустите ещё раз.",
+                &tr("desktop.no_answer"),
             );
         }
         return;
@@ -180,7 +255,7 @@ pub fn run() {
             Ok(())
         })
         .build(tauri::generate_context!())
-        .expect("error while building Улей")
+        .expect("error while building Ulei")
         .run(|app, event| {
             if matches!(
                 event,
