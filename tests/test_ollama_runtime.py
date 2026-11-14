@@ -9,7 +9,6 @@ from urllib.error import URLError
 import pytest
 
 from core.local_runtime import (
-    MESSAGES,
     LibraryModel,
     ModelTag,
     assess_fit,
@@ -17,6 +16,7 @@ from core.local_runtime import (
     load_bundled_library,
     load_library,
     merge_library,
+    message_for,
     parse_library_html,
 )
 from core.ollama_runtime import (
@@ -95,11 +95,14 @@ class FakeProc:
 
 
 def test_messages_are_russian():
-    assert "11434" in MESSAGES["port_busy"]
-    assert "администратора" in MESSAGES["binary_missing"]
-    assert "памяти" in MESSAGES["out_of_memory"]
-    assert "процессор" in MESSAGES["no_gpu"]
-    assert "диске" in MESSAGES["disk_full"]
+    from core.i18n import set_language
+
+    set_language("ru")
+    assert "11434" in message_for("port_busy")
+    assert "администратора" in message_for("binary_missing")
+    assert "памяти" in message_for("out_of_memory")
+    assert "процессор" in message_for("no_gpu")
+    assert "диске" in message_for("disk_full")
 
 
 def test_library_html_and_merge():
@@ -260,7 +263,7 @@ def test_starts_managed_process_and_stops_only_that(tmp_path):
     state = runtime.ensure_running()
     assert calls and calls[0][0][1] == "serve"
     assert state.running
-    assert state.gpu_note == MESSAGES["no_gpu"]
+    assert state.gpu_note == message_for("no_gpu")
     runtime.shutdown()
     assert proc.terminated
 

@@ -15,27 +15,23 @@ from typing import Callable, Protocol
 
 import yaml
 
+from core.i18n import t
 from core.paths import code_root
 
 LIBRARY_PATH = code_root() / "config" / "ollama_library.yaml"
 GIB = 1024**3
 
-MESSAGES = {
-    "port_busy": "Порт 11434 занят другой программой. Закройте её или укажите другой адрес Ollama в настройках.",
-    "binary_missing": "Программа Ollama не найдена. Нажмите «Установить Ollama» — права администратора не нужны.",
-    "download_failed": "Не удалось скачать. Проверьте интернет и повторите.",
-    "model_not_found": "Такой модели нет в библиотеке Ollama. Проверьте имя и тег.",
-    "out_of_memory": "Не хватает памяти. Выберите тег поменьше или закройте другие программы.",
-    "no_gpu": "Видеокарта не найдена, модель пойдёт на процессор. Это медленнее.",
-    "disk_full": "На диске не хватает места для этой модели.",
-    "unsupported": "Эта локальная среда ещё не подключена. Сейчас доступен Ollama.",
-}
+
+def message_for(code: str) -> str:
+    key = f"ollama.{code}"
+    text = t(key)
+    return t("ollama.failed") if text == key else text
 
 
 class LocalRuntimeError(Exception):
     def __init__(self, code: str, message: str | None = None):
         self.code = code
-        self.message = message or MESSAGES.get(code, "Локальная модель не запустилась.")
+        self.message = message or message_for(code)
         super().__init__(self.message)
 
 
@@ -149,15 +145,16 @@ def default_models_dir() -> Path:
 
 def format_bytes(size: int) -> str:
     if size <= 0:
-        return "размер неизвестен"
+        return t("ollama.size_unknown")
     value = float(size)
-    for unit in ("Б", "КБ", "МБ", "ГБ", "ТБ"):
-        if value < 1024 or unit == "ТБ":
-            if unit == "Б":
+    units = [t("unit.b"), t("unit.kb"), t("unit.mb"), t("unit.gb"), t("unit.tb")]
+    for unit in units:
+        if value < 1024 or unit == units[-1]:
+            if unit == units[0]:
                 return f"{int(value)} {unit}"
             return f"{value:.1f} {unit}"
         value /= 1024
-    return f"{value:.1f} ТБ"
+    return f"{value:.1f} {units[-1]}"
 
 
 def _gb(value: float) -> int:
@@ -261,14 +258,12 @@ def assess_fit(size_bytes: int, free_disk: int, ram_bytes: int, free_ram: int | 
     if ram_bytes > 0 and free_ram is not None and free_ram < ram_bytes:
         ram_ok = False
     if not disk_ok:
-        message = (
-            f"{MESSAGES['disk_full']} Нужно около {format_bytes(size_bytes)}, "
-            f"свободно {format_bytes(free_disk)}."
+        message = f"{t('ollama.disk_full')} " + t(
+            "ollama.need_bytes", need=format_bytes(size_bytes), free=format_bytes(free_disk)
         )
     elif not ram_ok:
-        message = (
-            f"{MESSAGES['out_of_memory']} Модели нужно около {format_bytes(ram_bytes)}, "
-            f"свободно {format_bytes(free_ram or 0)}."
+        message = f"{t('ollama.out_of_memory')} " + t(
+            "ollama.need_ram", need=format_bytes(ram_bytes), free=format_bytes(free_ram or 0)
         )
     else:
         message = ""
@@ -279,8 +274,8 @@ def catalog_entry(model_name: str) -> dict:
     """A free picker row for a model that is already on disk."""
     slug = re.sub(r"[^a-z0-9]+", "_", model_name.lower()).strip("_") or "model"
     return {
-        "name": f"{model_name} · Ollama (локально)",
-        "provider": "Ollama (локально)",
+        "name": t("ollama.picker_name", name=model_name),
+        "provider": t("ollama.provider"),
         "billing": "local",
         "litellm": f"ollama_chat/{model_name}",
         "price_status": "known",
@@ -288,10 +283,10 @@ def catalog_entry(model_name: str) -> dict:
         "price_output_per_1m": 0,
         "free_tier": True,
         "runnable": True,
-        "summary": "Локальная модель, без ключа и без оплаты за токены.",
-        "context": "зависит от тега",
-        "best_for": "работа без интернета",
-        "price_note": "Local: $0",
+        "summary": t("ollama.summary"),
+        "context": t("ollama.context"),
+        "best_for": t("ollama.best_for"),
+        "price_note": t("ollama.price_note"),
         "source": "https://ollama.com/library",
         "last_verified": "2026-11-13",
         "availability": "available",

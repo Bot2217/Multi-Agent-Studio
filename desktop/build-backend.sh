@@ -28,6 +28,7 @@ pyinstaller --noconfirm --clean --onefile --name ulei-backend \
   --add-data "config${SEP}config" \
   --add-data "tools${SEP}tools" \
   --add-data ".streamlit${SEP}.streamlit" \
+  --add-data "locales${SEP}locales" \
   ${CODESIGN[@]+"${CODESIGN[@]}"} \
   desktop/backend_entry.py
 mkdir -p desktop/src-tauri/binaries
