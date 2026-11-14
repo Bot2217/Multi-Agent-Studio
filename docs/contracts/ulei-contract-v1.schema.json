@@ -1,0 +1,444 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Bot2217/Multi-Agent-Studio/contracts/v1",
+  "title": "Ulei contract v1",
+  "$defs": {
+    "Agent": {
+      "description": "One role in the hive.",
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "description": {
+          "default": "",
+          "title": "Description",
+          "type": "string"
+        },
+        "enabled": {
+          "default": true,
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "model": {
+          "title": "Model",
+          "type": "string"
+        },
+        "temperature": {
+          "default": 0.2,
+          "title": "Temperature",
+          "type": "number"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "model"
+      ],
+      "title": "Agent",
+      "type": "object"
+    },
+    "Swarm": {
+      "description": "An ordered team. `steps` are agent ids, first to last.",
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "steps": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Steps",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "steps"
+      ],
+      "title": "Swarm",
+      "type": "object"
+    },
+    "Task": {
+      "description": "What the user asked the swarm to do.",
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "text": {
+          "title": "Text",
+          "type": "string"
+        },
+        "pipeline": {
+          "title": "Pipeline",
+          "type": "string"
+        },
+        "workspace": {
+          "title": "Workspace",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "text",
+        "pipeline",
+        "workspace"
+      ],
+      "title": "Task",
+      "type": "object"
+    },
+    "Message": {
+      "description": "One turn inside a run. Not a stream frame by itself.",
+      "properties": {
+        "role": {
+          "enum": [
+            "user",
+            "agent",
+            "tool",
+            "system"
+          ],
+          "title": "Role",
+          "type": "string"
+        },
+        "author": {
+          "title": "Author",
+          "type": "string"
+        },
+        "text": {
+          "title": "Text",
+          "type": "string"
+        },
+        "created_at": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Created At"
+        }
+      },
+      "required": [
+        "role",
+        "author",
+        "text"
+      ],
+      "title": "Message",
+      "type": "object"
+    },
+    "StartEvent": {
+      "properties": {
+        "version": {
+          "const": "1",
+          "default": "1",
+          "title": "Version",
+          "type": "string"
+        },
+        "type": {
+          "const": "start",
+          "default": "start",
+          "title": "Type",
+          "type": "string"
+        },
+        "task_id": {
+          "title": "Task Id",
+          "type": "string"
+        },
+        "pipeline": {
+          "title": "Pipeline",
+          "type": "string"
+        },
+        "agents": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Agents",
+          "type": "array"
+        }
+      },
+      "required": [
+        "task_id",
+        "pipeline",
+        "agents"
+      ],
+      "title": "StartEvent",
+      "type": "object"
+    },
+    "StepEvent": {
+      "properties": {
+        "version": {
+          "const": "1",
+          "default": "1",
+          "title": "Version",
+          "type": "string"
+        },
+        "type": {
+          "const": "step",
+          "default": "step",
+          "title": "Type",
+          "type": "string"
+        },
+        "task_id": {
+          "title": "Task Id",
+          "type": "string"
+        },
+        "index": {
+          "title": "Index",
+          "type": "integer"
+        },
+        "total": {
+          "title": "Total",
+          "type": "integer"
+        },
+        "agent_id": {
+          "title": "Agent Id",
+          "type": "string"
+        },
+        "title": {
+          "title": "Title",
+          "type": "string"
+        }
+      },
+      "required": [
+        "task_id",
+        "index",
+        "total",
+        "agent_id",
+        "title"
+      ],
+      "title": "StepEvent",
+      "type": "object"
+    },
+    "LogEvent": {
+      "properties": {
+        "version": {
+          "const": "1",
+          "default": "1",
+          "title": "Version",
+          "type": "string"
+        },
+        "type": {
+          "const": "log",
+          "default": "log",
+          "title": "Type",
+          "type": "string"
+        },
+        "task_id": {
+          "title": "Task Id",
+          "type": "string"
+        },
+        "agent_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Agent Id"
+        },
+        "text": {
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "task_id",
+        "text"
+      ],
+      "title": "LogEvent",
+      "type": "object"
+    },
+    "ErrorEvent": {
+      "properties": {
+        "version": {
+          "const": "1",
+          "default": "1",
+          "title": "Version",
+          "type": "string"
+        },
+        "type": {
+          "const": "error",
+          "default": "error",
+          "title": "Type",
+          "type": "string"
+        },
+        "task_id": {
+          "title": "Task Id",
+          "type": "string"
+        },
+        "agent_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Agent Id"
+        },
+        "code": {
+          "title": "Code",
+          "type": "string"
+        },
+        "message": {
+          "title": "Message",
+          "type": "string"
+        }
+      },
+      "required": [
+        "task_id",
+        "code",
+        "message"
+      ],
+      "title": "ErrorEvent",
+      "type": "object"
+    },
+    "DoneEvent": {
+      "properties": {
+        "version": {
+          "const": "1",
+          "default": "1",
+          "title": "Version",
+          "type": "string"
+        },
+        "type": {
+          "const": "done",
+          "default": "done",
+          "title": "Type",
+          "type": "string"
+        },
+        "task_id": {
+          "title": "Task Id",
+          "type": "string"
+        },
+        "outcome": {
+          "enum": [
+            "ok",
+            "stopped",
+            "failed"
+          ],
+          "title": "Outcome",
+          "type": "string"
+        },
+        "result": {
+          "default": "",
+          "title": "Result",
+          "type": "string"
+        }
+      },
+      "required": [
+        "task_id",
+        "outcome"
+      ],
+      "title": "DoneEvent",
+      "type": "object"
+    },
+    "LocalModelStatus": {
+      "description": "Download or runtime state of one local model.",
+      "properties": {
+        "version": {
+          "const": "1",
+          "default": "1",
+          "title": "Version",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "state": {
+          "enum": [
+            "missing",
+            "downloading",
+            "installed",
+            "starting",
+            "running",
+            "error"
+          ],
+          "title": "State",
+          "type": "string"
+        },
+        "progress": {
+          "anyOf": [
+            {
+              "maximum": 1,
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Progress"
+        },
+        "completed": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Completed"
+        },
+        "total": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Total"
+        },
+        "size_bytes": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Size Bytes"
+        },
+        "message": {
+          "default": "",
+          "title": "Message",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "state"
+      ],
+      "title": "LocalModelStatus",
+      "type": "object"
+    }
+  }
+}
