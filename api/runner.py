@@ -10,8 +10,11 @@ import time
 from collections.abc import Callable
 
 from contracts.v1 import DoneEvent, ErrorEvent, LogEvent, StartEvent, StepEvent, Task
+from core.agent_runtime import AgentRuntime
+from core.catalog import api_base_for
+from core.engine import AgentJob, AgentProblem, SwarmEngine, jobs_from_pipeline
 from core.i18n import t
-from core.orchestrator import Orchestrator
+from core.orchestrator import Orchestrator, resolve_model
 
 Publish = Callable[[StartEvent | StepEvent | LogEvent | ErrorEvent | DoneEvent], None]
 
@@ -93,3 +96,73 @@ def orchestrator_runner(
             )
         )
     publish(DoneEvent(task_id=task.id, outcome=outcome, result=result or ""))
+
+
+def engine_runner(
+    task: Task,
+    publish: Publish,
+    cancel: threading.Event,
+    timeout_s: float | None = None,
+    *,
+    api_keys: dict[str, str] | None = None,
+    config: dict | None = None,
+) -> None:
+    """HTTP path. Independent roles in one wave run at the same time."""
+    hive = Orchestrator(
+        workspace=task.workspace,
+        backup_dir=task.workspace,
+        api_keys=api_keys or {},
+        config=config,
+        pipeline_name=task.pipeline,
+        log_fn=lambda _text: None,
+        should_stop=cancel.is_set,
+    )
+
+    def agent_title(agent_id: str) -> str | None:
+        raw = hive._agent_cfg(agent_id)
+        if not raw.get("enabled", True):
+            return None
+        return str(raw.get("name") or agent_id)
+
+    jobs = jobs_from_pipeline(hive.cfg, task.pipeline, agent_title)
+
+    def execute(job: AgentJob, context: str, should_stop: Callable[[], bool]) -> str:
+        raw = hive._agent_cfg(job.id)
+        model_key = str(raw.get("model") or "")
+        model_id = resolve_model(hive.cfg, model_key, hive.catalog) if model_key else ""
+        api_key = hive._api_key_for_model(model_id)
+        if not api_key:
+            raise AgentProblem(
+                "missing_api_key",
+                t("orch.skip_key", name=job.title, model=model_id),
+            )
+
+        def log(text: str) -> None:
+            publish(LogEvent(task_id=task.id, agent_id=job.id, text=str(text)))
+
+        tools = raw.get("tools")
+        runtime = AgentRuntime(
+            workspace=task.workspace,
+            backup_dir=task.workspace,
+            model=model_id,
+            api_key=api_key,
+            base_url=api_base_for(model_id, hive.catalog.get(model_key) or {}),
+            temperature=float(raw.get("temperature", 0.2)),
+            max_steps=hive.max_steps,
+            shell_timeout=hive.shell_timeout,
+            log_fn=log,
+            system_prompt=raw.get("system") or "",
+            allowed_tools=None if tools is None else list(tools),
+            role_name=job.title,
+            should_stop=should_stop,
+        )
+        return runtime.run(task.text, context=context)
+
+    SwarmEngine(execute).run(
+        task.id,
+        task.pipeline,
+        jobs,
+        publish,
+        cancel,
+        timeout_s,
+    )
