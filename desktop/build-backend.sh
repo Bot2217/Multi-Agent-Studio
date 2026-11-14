@@ -21,8 +21,13 @@ fi
 pyinstaller --noconfirm --clean --onefile --name ulei-backend \
   --collect-all streamlit \
   --collect-all litellm \
+  --collect-all fastapi \
+  --collect-all starlette \
+  --collect-all uvicorn \
   --collect-submodules core \
   --collect-submodules tools \
+  --collect-submodules api \
+  --collect-submodules contracts \
   --add-data "app.py${SEP}." \
   --add-data "core${SEP}core" \
   --add-data "config${SEP}config" \

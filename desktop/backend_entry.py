@@ -6,21 +6,10 @@ import os
 import sys
 
 
-def _parse_port(argv: list[str]) -> str:
-    port = os.environ.get("MAS_PORT", "").strip()
-    if "--port" in argv:
-        index = argv.index("--port")
-        if index + 1 < len(argv):
-            port = argv[index + 1].strip()
-    if not port.isdigit():
-        from core.i18n import t
-
-        raise SystemExit(t("shell.port_required"))
-    return port
-
-
 def main() -> None:
-    port = _parse_port(sys.argv[1:])
+    from api.serve import parse_ports
+
+    port, api_port = parse_ports(sys.argv[1:])
     os.environ["MAS_DESKTOP"] = "1"
     from core.paths import code_root, data_root, migrate_user_files
 
@@ -41,6 +30,13 @@ def main() -> None:
     os.environ["STREAMLIT_SERVER_ENABLECORS"] = "false"
     os.environ["STREAMLIT_SERVER_ENABLEXSRFPROTECTION"] = "false"
     os.environ["STREAMLIT_GLOBAL_DEVELOPMENTMODE"] = "false"
+
+    try:
+        from api.serve import serve_in_thread
+
+        serve_in_thread(api_port or None)
+    except Exception as exc:
+        print(f"API_FAILED {exc}", flush=True)
 
     app = code_root() / "app.py"
     sys.argv = [
