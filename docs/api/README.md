@@ -23,7 +23,12 @@
 | POST | `/api/v1/tasks/{id}/cancel` | код 202 |
 | GET | `/api/v1/tasks/{id}/events` | SSE, по кадру на строку `data:` |
 | WS | `/api/v1/tasks/{id}/stream` | те же кадры JSON |
+| GET | `/api/v1/models/catalog` | поиск по библиотеке: `q`, `quant`, `max_gb`, `max_ram_gb`, `max_vram_gb`, `fits` |
 | GET | `/api/v1/models/local` | статусы локальных моделей |
+| POST | `/api/v1/models/local/{name}/pull` | начать скачивание |
+| POST | `/api/v1/models/local/{name}/pause` | пауза (`state: paused`) |
+| POST | `/api/v1/models/local/{name}/resume` | продолжить |
+| POST | `/api/v1/models/local/{name}/cancel` | отменить |
 
 Создать задачу:
 
@@ -49,4 +54,6 @@ data: {"version":"1","type":"done","task_id":"task_0001","outcome":"ok","result"
 
 WebSocket шлёт тот же JSON одним сообщением на кадр и закрывается после `done`.
 
-Запуск идёт через движок v2. Роли из одного `waves` в `config/agents.yaml` работают одновременно; без `waves` каждый шаг ждёт предыдущий, как раньше. Окно Streamlit по-прежнему вызывает старый оркестратор и от этого порта не зависит.
+Запуск идёт через движок v2. Роли из одного `waves` в `config/agents.yaml` работают одновременно; без `waves` каждый шаг ждёт предыдущий, как раньше. Если у роли локальная модель (`ollama_chat/...`), движок сначала поднимает Ollama и, если это не вышло, шлёт `error` с кодом среды (`binary_missing`, `port_busy`, …) и `done` с `outcome: "failed"`. Окно Streamlit по-прежнему вызывает старый оркестратор и от этого порта не зависит.
+
+Каталог — теги из `config/ollama_library.yaml`. У каждого есть размер, квантизация и оценка RAM/VRAM. `fits=true` оставляет только те, что влезают в свободный диск, память и, если она известна, видеопамять. Цифры ориентировочные.

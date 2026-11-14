@@ -40,6 +40,8 @@ class ModelTag:
     tag: str
     size_bytes: int
     ram_bytes: int
+    quant: str = ""
+    vram_bytes: int = 0
 
     @property
     def ref_suffix(self) -> str:
@@ -80,6 +82,7 @@ class Fit:
     disk_ok: bool
     ram_ok: bool
     message: str = ""
+    vram_ok: bool = True
 
 
 @dataclass
@@ -179,6 +182,8 @@ def load_bundled_library(path: Path | None = None) -> list[LibraryModel]:
                     tag=str(raw.get("tag") or "latest"),
                     size_bytes=_gb(raw.get("size_gb") or 0),
                     ram_bytes=_gb(raw.get("ram_gb") or 0),
+                    quant=str(raw.get("quant") or ""),
+                    vram_bytes=_gb(raw.get("vram_gb") or 0),
                 )
             )
         models.append(
@@ -252,11 +257,17 @@ def merge_library(bundled: list[LibraryModel], remote_names: list[str]) -> list[
     return merged
 
 
-def assess_fit(size_bytes: int, free_disk: int, ram_bytes: int, free_ram: int | None) -> Fit:
+def assess_fit(
+    size_bytes: int,
+    free_disk: int,
+    ram_bytes: int,
+    free_ram: int | None,
+    vram_bytes: int = 0,
+    free_vram: int | None = None,
+) -> Fit:
     disk_ok = size_bytes <= 0 or free_disk > size_bytes + 256 * 1024 * 1024
-    ram_ok = True
-    if ram_bytes > 0 and free_ram is not None and free_ram < ram_bytes:
-        ram_ok = False
+    ram_ok = not (ram_bytes > 0 and free_ram is not None and free_ram < ram_bytes)
+    vram_ok = not (vram_bytes > 0 and free_vram is not None and free_vram < vram_bytes)
     if not disk_ok:
         message = f"{t('ollama.disk_full')} " + t(
             "ollama.need_bytes", need=format_bytes(size_bytes), free=format_bytes(free_disk)
@@ -265,9 +276,13 @@ def assess_fit(size_bytes: int, free_disk: int, ram_bytes: int, free_ram: int | 
         message = f"{t('ollama.out_of_memory')} " + t(
             "ollama.need_ram", need=format_bytes(ram_bytes), free=format_bytes(free_ram or 0)
         )
+    elif not vram_ok:
+        message = f"{t('ollama.out_of_memory')} " + t(
+            "ollama.need_vram", need=format_bytes(vram_bytes), free=format_bytes(free_vram or 0)
+        )
     else:
         message = ""
-    return Fit(disk_ok=disk_ok, ram_ok=ram_ok, message=message)
+    return Fit(disk_ok=disk_ok, ram_ok=ram_ok, vram_ok=vram_ok, message=message)
 
 
 def catalog_entry(model_name: str) -> dict:

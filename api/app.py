@@ -103,9 +103,18 @@ def create_app(
     config: dict | None = None,
     runner: Callable | None = None,
     models: ModelSource | None = None,
+    downloads=None,
+    search=None,
 ) -> FastAPI:
     cfg = config if config is not None else load_hive_config(config_path)
     engine = Engine(cfg, runner=runner, models=models)
+    if downloads is None:
+        from core.downloads import DownloadManager
+        from core.ollama_runtime import OllamaRuntime
+
+        downloads = DownloadManager(OllamaRuntime().pull)
+    if search is None:
+        search = _default_search
     app = FastAPI(title="Улей", version=CONTRACT_VERSION)
     app.add_middleware(
         CORSMiddleware,
@@ -204,9 +213,66 @@ def create_app(
 
     @app.get("/api/v1/models/local")
     def local_models():
-        return [item.model_dump() for item in engine.models()]
+        merged = {item.name: item for item in engine.models()}
+        for item in downloads.statuses():
+            merged[item.name] = item
+        return [item.model_dump() for item in merged.values()]
+
+    @app.get("/api/v1/models/catalog")
+    def catalog(
+        q: str = "",
+        quant: str = "",
+        max_gb: float | None = None,
+        max_ram_gb: float | None = None,
+        max_vram_gb: float | None = None,
+        fits: bool = False,
+    ):
+        hits = search(
+            text=q,
+            quant=quant,
+            max_size=None if max_gb is None else int(max_gb * 1024**3),
+            max_ram=None if max_ram_gb is None else int(max_ram_gb * 1024**3),
+            max_vram=None if max_vram_gb is None else int(max_vram_gb * 1024**3),
+            only_fit=fits,
+        )
+        return [hit.__dict__ for hit in hits]
+
+    @app.post("/api/v1/models/local/{name:path}/pull", status_code=202)
+    def pull_model(name: str):
+        return downloads.start(name).model_dump()
+
+    @app.post("/api/v1/models/local/{name:path}/pause", status_code=202)
+    def pause_model(name: str):
+        found = downloads.pause(name)
+        if found is None:
+            raise HTTPException(status_code=404, detail="model_not_downloading")
+        return found.model_dump()
+
+    @app.post("/api/v1/models/local/{name:path}/resume", status_code=202)
+    def resume_model(name: str):
+        found = downloads.resume(name)
+        if found is None:
+            raise HTTPException(status_code=404, detail="model_not_downloading")
+        return found.model_dump()
+
+    @app.post("/api/v1/models/local/{name:path}/cancel", status_code=202)
+    def cancel_model(name: str):
+        found = downloads.cancel(name)
+        if found is None:
+            raise HTTPException(status_code=404, detail="model_not_downloading")
+        return found.model_dump()
 
     return app
+
+
+def _default_search(**kwargs):
+    from core.catalog_search import Hardware, search_models
+    from core.local_runtime import load_bundled_library
+    from core.ollama_runtime import OllamaRuntime
+
+    runtime = OllamaRuntime()
+    hardware = Hardware(runtime.disk_free(), runtime.ram_free(), None)
+    return search_models(load_bundled_library(), hardware, **kwargs)
 
 
 def _sse(frames: Iterator[dict]) -> Iterator[str]:
