@@ -14,7 +14,7 @@
 
    Без этой подписи проверка CLA не пройдёт. Подписи хранятся в `signatures/cla.json` на ветке `cla-signatures`. Файл создаёт действие GitHub при первой подписи, его не нужно добавлять вручную.
 
-Владелец Bot2217, соавтор Vlasov-Timofey и боты `cursor[bot]`, `dependabot[bot]`, `github-actions[bot]` в списке исключений и подпись не ставят.
+Владелец Bot2217, соавтор Vlasov-Timofey и боты `cursoragent`, `cursor[bot]`, `dependabot[bot]`, `github-actions[bot]` в списке исключений и подпись не ставят.
 
 ## Как устроен запрос
 
