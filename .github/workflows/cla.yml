@@ -25,6 +25,6 @@ jobs:
           path-to-signatures: signatures/cla.json
           path-to-document: https://github.com/Bot2217/Multi-Agent-Studio/blob/main/CLA.md
           branch: cla-signatures
-          allowlist: Bot2217,Vlasov-Timofey,cursor[bot],dependabot[bot],github-actions[bot]
+          allowlist: Bot2217,Vlasov-Timofey,cursoragent,cursor[bot],dependabot[bot],github-actions[bot]
           create-file-commit-message: Create the CLA signature file
           signed-commit-message: $contributorName has signed the CLA in $owner/$repo#$pullRequestNo
