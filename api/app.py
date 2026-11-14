@@ -14,7 +14,7 @@ from pydantic import BaseModel, Field
 
 from api.bus import EventBus
 from api.hive import TaskBook, list_agents, list_swarms, load_hive_config
-from api.runner import orchestrator_runner
+from api.runner import engine_runner
 from contracts.v1 import CONTRACT_VERSION, DoneEvent, ErrorEvent, LocalModelStatus, Task
 from core.ui_helpers import load_keys_from_env
 
@@ -88,7 +88,7 @@ class Engine:
 
 
 def _default_runner(task, publish, cancel, timeout_s) -> None:
-    orchestrator_runner(
+    engine_runner(
         task,
         publish,
         cancel,
