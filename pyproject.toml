@@ -1,6 +1,6 @@
 [project]
 name = "ulei"
-version = "0.1.0"
+version = "0.1.1"
 description = "Улей — многоагентная студия"
 readme = "README.md"
 license = "AGPL-3.0-or-later"
