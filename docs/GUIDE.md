@@ -31,9 +31,9 @@
 
 | Система | Файл |
 | --- | --- |
-| Windows | `Ulei_0.1.0_x64-setup.exe` и MSI |
-| macOS | `Ulei_0.1.0_aarch64.dmg` и архив обновления `.app.tar.gz` |
-| Linux | `Ulei_0.1.0_amd64.AppImage` и `.deb` |
+| Windows | `Ulei_0.1.1_x64-setup.exe` и MSI |
+| macOS | `Ulei_0.1.1_aarch64.dmg` и архив обновления `.app.tar.gz` |
+| Linux | `Ulei_0.1.1_amd64.AppImage` и `.deb` |
 
 Подпись кода не покупалась: macOS подписан ad-hoc (`codesign -`), без аккаунта Apple Developer. Windows SmartScreen пишет «неизвестный издатель»: «Подробнее», затем «Выполнить в любом случае». macOS может написать «Приложение «Улей.app» повреждено»: `xattr -cr "/Applications/Улей.app"` или правый клик → «Открыть».
 
@@ -66,8 +66,8 @@ npx tauri signer generate -w ~/.tauri/ulei.key
 Первый релиз: в `main` после слияния
 
 ```bash
-git tag v0.1.0
-git push origin v0.1.0
+git tag v0.1.1
+git push origin v0.1.1
 ```
 
 Workflow `release.yml` собирает три системы и кладёт черновик Release. Публичный ключ записан в `desktop/src-tauri/tauri.conf.json`. На теге workflow ещё раз подставляет секрет `TAURI_SIGNING_PUBLIC_KEY`, включает `createUpdaterArtifacts` и загружает `latest.json` вместе с подписями. Имена вложений задаёт шаблон `Ulei_[version]_[arch][setup][ext]`. Без секретов `TAURI_SIGNING_*` тег не собирается. Локальная сборка без приватного ключа по-прежнему делает установщики, но без подписи обновления.
