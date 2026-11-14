@@ -18,8 +18,8 @@ from typing import Callable
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
+from core.i18n import t
 from core.local_runtime import (
-    MESSAGES,
     InstalledModel,
     LocalRuntimeError,
     Probe,
@@ -63,7 +63,7 @@ def asset_name(system: str | None = None, machine: str | None = None) -> str:
     if not name:
         raise LocalRuntimeError(
             "download_failed",
-            f"Для {system}/{machine} нет готовой сборки Ollama.",
+            t("ollama.no_build", system=system, machine=machine),
         )
     return name
 
@@ -110,13 +110,15 @@ class UrllibClient:
                 with partial.open("wb") as handle:
                     while True:
                         if cancel():
-                            raise LocalRuntimeError("download_failed", "Загрузка отменена.")
+                            raise LocalRuntimeError(
+                                "download_failed", t("ollama.download_cancelled")
+                            )
                         chunk = response.read(1024 * 256)
                         if not chunk:
                             break
                         handle.write(chunk)
                         done += len(chunk)
-                        on_progress("Скачиваю Ollama", done, total)
+                        on_progress(t("ollama.downloading_app"), done, total)
             partial.replace(dest)
         except LocalRuntimeError:
             partial.unlink(missing_ok=True)
@@ -143,7 +145,10 @@ class UrllibClient:
 
 class OllamaRuntime:
     runtime_id = "ollama"
-    label = "Ollama (локально)"
+
+    @property
+    def label(self) -> str:
+        return t("ollama.provider")
 
     def __init__(
         self,
@@ -195,7 +200,7 @@ class OllamaRuntime:
 
     def probe(self) -> Probe:
         binary = self._binary_path()
-        note = "" if self._gpu() else MESSAGES["no_gpu"]
+        note = "" if self._gpu() else t("ollama.no_gpu")
         try:
             status, payload = self.http.get(f"{self.base_url}/api/tags", timeout=3)
         except URLError as exc:
@@ -226,13 +231,11 @@ class OllamaRuntime:
         archive = self.home / name
         url = DOWNLOAD_ROOT + name
         self.http.download(url, archive, on_progress, cancel)
-        on_progress("Распаковываю Ollama", 0, 0)
+        on_progress(t("ollama.unpacking"), 0, 0)
         try:
             _extract(archive, self.home)
         except (OSError, tarfile.TarError, zipfile.BadZipFile) as exc:
-            raise LocalRuntimeError(
-                "download_failed", "Архив Ollama повреждён. Повторите загрузку."
-            ) from exc
+            raise LocalRuntimeError("download_failed", t("ollama.archive_bad")) from exc
         finally:
             archive.unlink(missing_ok=True)
         binary = self._find_unpacked()
@@ -274,7 +277,7 @@ class OllamaRuntime:
             if proc.poll() is not None:
                 raise LocalRuntimeError(
                     "binary_missing",
-                    "Ollama завершился сразу после старта. Смотрите журнал на экране «Локальные модели».",
+                    t("ollama.exited"),
                 )
             try:
                 status, payload = self.http.get(f"{self.base_url}/api/tags", timeout=2)
@@ -284,7 +287,7 @@ class OllamaRuntime:
             if status == 200 and _looks_like_tags(payload):
                 return self.probe()
             time.sleep(0.4)
-        raise LocalRuntimeError("port_busy", "Ollama не ответил на порту 11434.")
+        raise LocalRuntimeError("port_busy", t("ollama.no_answer"))
 
     def shutdown(self) -> None:
         proc = self._proc
@@ -322,7 +325,7 @@ class OllamaRuntime:
         try:
             for raw in stream:
                 if cancel():
-                    raise LocalRuntimeError("download_failed", "Загрузка модели отменена.")
+                    raise LocalRuntimeError("download_failed", t("ollama.model_cancelled"))
                 line = raw.decode("utf-8", errors="replace").strip()
                 if not line:
                     continue
@@ -333,7 +336,7 @@ class OllamaRuntime:
                     if "space" in error.lower() or "disk" in error.lower():
                         raise LocalRuntimeError("disk_full")
                     raise LocalRuntimeError("download_failed", error)
-                on_progress(status or "Скачиваю", completed, total)
+                on_progress(status or t("ollama.pulling"), completed, total)
         finally:
             close = getattr(stream, "close", None)
             if close:
@@ -347,7 +350,7 @@ class OllamaRuntime:
             raise LocalRuntimeError("model_not_found")
         if status >= 400:
             text = payload.decode("utf-8", errors="replace")
-            raise LocalRuntimeError("download_failed", text or MESSAGES["download_failed"])
+            raise LocalRuntimeError("download_failed", text or t("ollama.download_failed"))
 
     def warmup(self, name: str) -> None:
         status, payload = self.http.post(
@@ -367,7 +370,7 @@ class OllamaRuntime:
         if "out of memory" in text or "insufficient memory" in text:
             raise LocalRuntimeError("out_of_memory")
         if status >= 400:
-            raise LocalRuntimeError("download_failed", "Не удалось прогреть модель.")
+            raise LocalRuntimeError("download_failed", t("ollama.warmup_failed"))
 
     def _api_get(self, path: str) -> tuple[int, bytes]:
         try:
@@ -375,7 +378,7 @@ class OllamaRuntime:
         except URLError as exc:
             reason = getattr(exc, "reason", exc)
             if isinstance(reason, ConnectionRefusedError):
-                raise LocalRuntimeError("binary_missing", "Ollama не запущен.") from exc
+                raise LocalRuntimeError("binary_missing", t("ollama.not_running")) from exc
             raise LocalRuntimeError("port_busy") from exc
         except OSError as exc:
             raise LocalRuntimeError("port_busy") from exc

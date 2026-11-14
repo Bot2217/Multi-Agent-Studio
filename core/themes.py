@@ -8,7 +8,6 @@ from core.icons import icon_css
 
 DEFAULT_THEME = "auto"
 THEME_ORDER = ("auto", "light", "dark")
-THEME_LABELS = {"auto": "Авто", "light": "Светлая", "dark": "Тёмная"}
 # Older saved theme ids carried both the mode and the palette.
 # night/pine were the charcoal theme, paper the light paper theme,
 # ember/kiln the dark warm theme.
@@ -20,20 +19,12 @@ LEGACY_APPEARANCE = {
     "kiln": ("dark", "warm"),
 }
 
-# Left-hand menu. First item is the home flow.
-SCREENS = (
-    ("run", "Запуск"),
-    ("agents", "Агенты"),
-    ("models", "Модели"),
-    ("local", "Локальные модели"),
-    ("files", "Файлы"),
-    ("settings", "Настройки"),
-)
+# Left-hand menu. First item is the home flow. Labels live in locales/.
+SCREEN_IDS = ("run", "agents", "models", "local", "files", "settings")
 LEGACY_SCREENS = {"ssh": "settings", "help": "settings"}
 
 DEFAULT_PALETTE = "graphite"
 PALETTE_ORDER = ("graphite", "warm")
-PALETTE_LABELS = {"graphite": "Графит", "warm": "Тёплая"}
 
 _COOL_LIGHT_BADGES = {
     "free": {"bg": "#dcefe3", "fg": "#17603a"},
@@ -180,10 +171,9 @@ def migrate_appearance(theme: str | None, palette: str | None = None) -> tuple[s
 def resolve_screen(name: str | None) -> str:
     key = str(name or "").strip().lower()
     key = LEGACY_SCREENS.get(key, key)
-    known = {screen_id for screen_id, _label in SCREENS}
-    if key in known:
+    if key in SCREEN_IDS:
         return key
-    return SCREENS[0][0]
+    return SCREEN_IDS[0]
 
 
 def _channel(value: int) -> float:

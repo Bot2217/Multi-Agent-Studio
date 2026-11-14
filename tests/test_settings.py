@@ -35,4 +35,4 @@ def test_user_settings_roundtrip(tmp_path, monkeypatch):
 def test_project_preset_is_always_offered(tmp_path):
     missing = tmp_path / "does-not-exist"
     labels = [label for label, _path in preset_paths(missing)]
-    assert "Проект" in labels
+    assert "project" in labels

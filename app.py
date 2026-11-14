@@ -1,4 +1,4 @@
-"""Multi-Agent Studio — локальный интерфейс ролей, пайплайнов и каталога моделей."""
+"""Ulei studio: roles, pipelines, and the model catalog."""
 
 from __future__ import annotations
 
@@ -30,14 +30,13 @@ from core.catalog import (
     runnable_models,
     sorted_model_keys,
 )
+from core.i18n import role_word, set_language, t
 from core.orchestrator import load_config
 from core.runner import RunJob
 from core.themes import (
     LEGACY_APPEARANCE,
-    PALETTE_LABELS,
     PALETTE_ORDER,
-    SCREENS,
-    THEME_LABELS,
+    SCREEN_IDS,
     THEME_ORDER,
     migrate_appearance,
     resolve_palette,
@@ -54,30 +53,20 @@ from core.ui_helpers import (
 )
 
 KEY_LABELS = [
-    ("Google", "GOOGLE_API_KEY", "Gemini, есть бесплатная квота"),
-    ("OpenRouter", "OPENROUTER_API_KEY", "модели с суффиксом :free"),
-    ("Anthropic", "ANTHROPIC_API_KEY", "Claude"),
-    ("OpenAI", "OPENAI_API_KEY", "GPT"),
-    ("xAI", "XAI_API_KEY", "Grok"),
-    ("DeepSeek", "DEEPSEEK_API_KEY", "DeepSeek"),
-    ("Groq", "GROQ_API_KEY", "открытые модели на Groq"),
-    ("Mistral", "MISTRAL_API_KEY", "Mistral и Codestral"),
-    ("Cerebras", "CEREBRAS_API_KEY", "Cerebras"),
+    ("Google", "GOOGLE_API_KEY", "key.google"),
+    ("OpenRouter", "OPENROUTER_API_KEY", "key.openrouter"),
+    ("Anthropic", "ANTHROPIC_API_KEY", "key.anthropic"),
+    ("OpenAI", "OPENAI_API_KEY", "key.openai"),
+    ("xAI", "XAI_API_KEY", "key.xai"),
+    ("DeepSeek", "DEEPSEEK_API_KEY", "key.deepseek"),
+    ("Groq", "GROQ_API_KEY", "key.groq"),
+    ("Mistral", "MISTRAL_API_KEY", "key.mistral"),
+    ("Cerebras", "CEREBRAS_API_KEY", "key.cerebras"),
 ]
 
-PIPELINE_LABELS = {
-    "code_only": "Быстро: код и ревью",
-    "full": "Полный цикл",
-    "research_code": "Исследование и код",
-    "single": "Один разработчик",
-}
+PIPELINE_IDS = ("code_only", "full", "research_code", "single")
 
-BILLING_FILTERS = {
-    "Все": "all",
-    "Бесплатные": "free",
-    "Платные": "paid",
-    "Локальные": "local",
-}
+BILLING_FILTERS = ("all", "free", "paid", "local")
 
 DEFAULT_WS = DATA / "workspace"
 BACKUPS = DATA / "backups"
@@ -92,6 +81,7 @@ SETTING_DEFAULTS = {
     "keep_display": False,
     "ollama_base": "http://127.0.0.1:11434",
     "ollama_models_dir": "",
+    "language": "auto",
 }
 
 
@@ -188,7 +178,9 @@ def workspace_dir() -> Path:
 
 
 def badge(billing: str) -> str:
-    label = BILLING_BADGE.get(billing, billing or "Unknown")
+    label = (
+        t(f"billing.{billing}") if billing in BILLING_BADGE else (billing or t("billing.unknown"))
+    )
     kind = billing if billing in BILLING_BADGE else "unknown"
     return f'<span class="badge badge-{kind}">{html.escape(label)}</span>'
 
@@ -210,11 +202,7 @@ ICONS = {
     "clock": "M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18M12 7v5l3 2",
 }
 
-EXAMPLES = [
-    "Создай hello.py, который печатает приветствие, и запусти его",
-    "Напиши README.md с описанием файлов в этой папке",
-    "Найди в коде все TODO и собери их в todo.md",
-]
+EXAMPLE_KEYS = ("example.hello", "example.readme", "example.todo")
 
 
 def svg(name: str, size: int = 18) -> str:
@@ -280,8 +268,8 @@ def recent_runs(limit: int = 4) -> list[tuple[str, str]]:
 def duration(seconds: float) -> str:
     seconds = int(seconds)
     if seconds < 60:
-        return f"{seconds} с"
-    return f"{seconds // 60} мин {seconds % 60} с"
+        return t("time.seconds", n=seconds)
+    return t("time.minutes", m=seconds // 60, s=seconds % 60)
 
 
 # ---------- sidebar ----------
@@ -297,29 +285,31 @@ def render_sidebar() -> None:
             '<path fill="#9be0b8" d="M9.6 8.4 14.8 11.4v6l-5.2 3-5.2-3v-6z"/>'
             '<path fill="#eef0f4" d="M16 15.6 21.2 18.6v6L16 27.6 10.8 24.6v-6z"/>'
             "</svg>"
-            "<div><b>Улей</b><small>студия</small></div></div>",
+            f"<div><b>Улей</b><small>{html.escape(t('brand.studio'))}</small></div></div>",
             unsafe_allow_html=True,
         )
-        for screen_id, label in SCREENS:
+        for screen_id in SCREEN_IDS:
             st.button(
-                label,
+                t(f"nav.{screen_id}"),
                 key=f"nav_{screen_id}",
                 type="primary" if screen_id == current else "secondary",
                 width="stretch",
                 on_click=go,
                 args=(screen_id,),
             )
-        st.markdown('<p class="side-label">Тема</p>', unsafe_allow_html=True)
+        st.markdown(
+            f'<p class="side-label">{html.escape(t("theme.label"))}</p>', unsafe_allow_html=True
+        )
 
         def set_theme() -> None:
             st.session_state.theme = resolve_theme(st.session_state.get("w_theme"))
             persist()
 
         st.segmented_control(
-            "Тема",
+            t("theme.label"),
             THEME_ORDER,
             default=resolve_theme(st.session_state.get("theme")),
-            format_func=lambda item: THEME_LABELS[item],
+            format_func=lambda item: t(f"theme.{item}"),
             key="w_theme",
             on_change=set_theme,
             label_visibility="collapsed",
@@ -340,8 +330,7 @@ def pipeline_steps(cfg: dict, pipelines: dict) -> tuple[list[str], list[str]]:
 def render_chain(cfg: dict, active: list[str], catalog: dict, no_key: set[str]) -> None:
     agents_cfg = cfg.get("agents") or {}
     count = len(active)
-    word = "роль" if count == 1 else "роли" if 2 <= count <= 4 else "ролей"
-    eyebrow("Цепочка", f"{count} {word}")
+    eyebrow(t("chain.title"), f"{count} {role_word(count)}")
     items = []
     for index, agent_id in enumerate(active, 1):
         model_key = st.session_state.agent_overrides.get(agent_id, {}).get("model", "")
@@ -349,7 +338,7 @@ def render_chain(cfg: dict, active: list[str], catalog: dict, no_key: set[str]) 
         name = html.escape(str(agents_cfg.get(agent_id, {}).get("name", agent_id)))
         model_name = html.escape(str(meta.get("name") or model_key))
         missing = model_key in no_key
-        tag = '<span class="tag quiet">нет ключа</span>' if missing else ""
+        tag = f'<span class="tag quiet">{html.escape(t("chain.no_key"))}</span>' if missing else ""
         items.append(
             f'<li class="{"nokey" if missing else ""}"><span class="num">{index}</span>'
             f'<span class="who"><b>{name}</b><small>{model_name}</small></span>{tag}</li>'
@@ -357,20 +346,20 @@ def render_chain(cfg: dict, active: list[str], catalog: dict, no_key: set[str]) 
     if items:
         st.markdown(f'<ol class="steps">{"".join(items)}</ol>', unsafe_allow_html=True)
     else:
-        empty("Все роли выключены.")
+        empty(t("chain.all_off"))
 
 
 def render_folder_picker() -> None:
     folder = workspace_dir()
-    with st.popover(f"Папка: {folder.name or folder}", width="stretch"):
-        st.caption("Агенты читают и пишут файлы только в этой папке.")
+    with st.popover(t("folder.button", name=folder.name or folder), width="stretch"):
+        st.caption(t("folder.caption"))
 
         def set_path() -> None:
             st.session_state.workspace_path = st.session_state.w_workspace_path.strip()
             persist()
 
         st.text_input(
-            "Путь",
+            t("folder.path"),
             value=st.session_state.workspace_path,
             key="w_workspace_path",
             on_change=set_path,
@@ -383,9 +372,10 @@ def render_folder_picker() -> None:
 
         presets = preset_paths(DEFAULT_WS)
         for column, (label, path) in zip(st.columns(len(presets)), presets):
-            column.button(label, key=f"ws_{label}", on_click=choose, args=(path,), width="stretch")
+            shown = t("folder.preset_project") if label == "project" else label
+            column.button(shown, key=f"ws_{label}", on_click=choose, args=(path,), width="stretch")
         if not folder.is_dir():
-            st.caption("Такой папки ещё нет — она будет создана при запуске.")
+            st.caption(t("folder.missing"))
 
 
 def render_run(cfg: dict, catalog: dict, pipelines: dict) -> None:
@@ -393,9 +383,9 @@ def render_run(cfg: dict, catalog: dict, pipelines: dict) -> None:
     busy = bool(job and job.running)
     free = sum(1 for meta in catalog.values() if is_free_option(meta))
     page_head(
-        "Запуск",
-        "Что сделать?",
-        tags=((f"{len(catalog)} моделей в каталоге", True), (f"{free} бесплатных", False)),
+        t("run.section"),
+        t("run.title"),
+        tags=((t("run.catalog_count", n=len(catalog)), True), (t("run.free_count", n=free), False)),
     )
     _steps, active = pipeline_steps(cfg, pipelines)
     model_keys = [st.session_state.agent_overrides[a]["model"] for a in active]
@@ -405,26 +395,26 @@ def render_run(cfg: dict, catalog: dict, pipelines: dict) -> None:
 
     left, right = st.columns([2, 1], gap="medium")
     with left, st.container(key="card_task"):
-        eyebrow("Задача")
+        eyebrow(t("run.task"))
         bound(
             st.text_area,
-            "Задача",
+            t("run.task"),
             "task",
             save=False,
             height=120,
-            placeholder="Опишите, что нужно сделать. Одного предложения достаточно.",
+            placeholder=t("run.placeholder"),
             label_visibility="collapsed",
             disabled=busy,
         )
         if not str(st.session_state.task).strip() and not busy:
-            for index, text in enumerate(EXAMPLES):
+            for index, key in enumerate(EXAMPLE_KEYS):
                 st.button(
-                    text,
+                    t(key),
                     key=f"ex_{index}",
                     on_click=set_task,
-                    args=(text,),
+                    args=(t(key),),
                     width="stretch",
-                    help="Подставить пример: " + text,
+                    help=t("run.use_example", text=t(key)),
                 )
         mode_col, folder_col = st.columns([3, 2], vertical_alignment="bottom")
         with mode_col:
@@ -434,10 +424,10 @@ def render_run(cfg: dict, catalog: dict, pipelines: dict) -> None:
                 persist()
 
             st.selectbox(
-                "Режим",
+                t("run.mode"),
                 names,
                 index=names.index(st.session_state.pipeline),
-                format_func=lambda name: PIPELINE_LABELS.get(name, name),
+                format_func=lambda name: t(f"pipeline.{name}") if name in PIPELINE_IDS else name,
                 key="w_pipeline",
                 on_change=set_pipeline,
                 disabled=busy,
@@ -448,21 +438,21 @@ def render_run(cfg: dict, catalog: dict, pipelines: dict) -> None:
 
         blocked = ""
         if not active:
-            blocked = "В этом режиме выключены все роли."
-            st.warning(blocked + " Включите хотя бы одну в разделе «Агенты».")
+            blocked = t("run.roles_off")
+            st.warning(blocked + " " + t("run.roles_off_hint"))
         elif missing:
             envs = ", ".join(dict.fromkeys(env for _m, _p, env in missing))
             if len(no_key) == len(set(model_keys)):
-                blocked = "Нет ключа ни для одной модели."
-                text = f"Чтобы запустить, нужен ключ: {envs}. У Google AI Studio он бесплатный."
+                blocked = t("run.no_key_all")
+                text = t("run.no_key_all_hint", envs=envs)
             else:
-                text = f"Нет ключа {envs} — роли с пунктиром будут пропущены."
+                text = t("run.no_key_some", envs=envs)
             note, action = st.columns([3, 1], vertical_alignment="center")
             note.warning(text)
-            action.button("Добавить ключ", on_click=go, args=("settings",), width="stretch")
+            action.button(t("run.add_key"), on_click=go, args=("settings",), width="stretch")
 
         if st.button(
-            "Запустить",
+            t("run.start"),
             type="primary",
             width="stretch",
             key="launch_run",
@@ -474,7 +464,7 @@ def render_run(cfg: dict, catalog: dict, pipelines: dict) -> None:
     with right, st.container(key="card_chain"):
         render_chain(cfg, active, catalog, no_key)
         st.button(
-            "Настроить роли",
+            t("run.configure"),
             on_click=go,
             args=("agents",),
             type="tertiary",
@@ -488,8 +478,8 @@ def render_run(cfg: dict, catalog: dict, pipelines: dict) -> None:
             render_result()
         else:
             with st.container(key="card_idle"):
-                eyebrow("Ход работы")
-                empty("Здесь появятся журнал и результат запуска.")
+                eyebrow(t("run.progress_title"))
+                empty(t("run.progress_empty"))
         if not busy:
             render_history()
     with right:
@@ -502,7 +492,7 @@ def render_history() -> None:
     if not runs:
         return
     with st.container(key="card_history"):
-        eyebrow("Недавние задачи", "нажмите, чтобы повторить")
+        eyebrow(t("run.recent"), t("run.recent_hint"))
         for index, (when, task) in enumerate(runs):
             st.button(
                 f"{when} · {task}",
@@ -521,7 +511,7 @@ def render_files_card() -> None:
             files = list_files(folder) if folder.is_dir() else []
         except OSError:
             files = []
-        eyebrow("Файлы", f"{folder.name}/")
+        eyebrow(t("run.files"), f"{folder.name}/")
         if files:
             rows = "".join(
                 f'<div class="row">{svg("file")}<span class="name">{html.escape(name)}</span></div>'
@@ -529,15 +519,15 @@ def render_files_card() -> None:
             )
             st.markdown(f'<div class="rows">{rows}</div>', unsafe_allow_html=True)
             if len(files) > 5:
-                st.caption(f"и ещё {len(files) - 5}")
+                st.caption(t("run.files_more", n=len(files) - 5))
             st.button(
-                "Открыть файлы",
+                t("run.open_files"),
                 on_click=go,
                 args=("files",),
                 type="tertiary",
             )
         else:
-            st.caption("Пока пусто. Перед каждой перезаписью сохраняется копия в backups/.")
+            st.caption(t("run.files_empty"))
 
 
 def render_keys_card() -> None:
@@ -545,18 +535,18 @@ def render_keys_card() -> None:
     filled = [label for label, env, _hint in KEY_LABELS if str(keys.get(env) or "").strip()]
     shown = filled or [label for label, _env, _hint in KEY_LABELS[:2]]
     with st.container(key="card_keys"):
-        eyebrow("Ключи API", f"{len(filled)} из {len(KEY_LABELS)}")
+        eyebrow(t("run.keys"), t("run.keys_count", filled=len(filled), total=len(KEY_LABELS)))
         rows = []
         for label in shown:
             ok = label in filled
             rows.append(
                 f'<div class="row"><span class="dot {"ok" if ok else ""}"></span>'
                 f'<span class="label">{html.escape(label)}</span>'
-                f'<span class="state {"ok" if ok else ""}">{"задан" if ok else "не задан"}</span></div>'
+                f'<span class="state {"ok" if ok else ""}">{html.escape(t("run.key_set") if ok else t("run.key_missing"))}</span></div>'
             )
         st.markdown(f'<div class="rows">{"".join(rows)}</div>', unsafe_allow_html=True)
         st.button(
-            "Управлять ключами",
+            t("run.manage_keys"),
             on_click=go,
             args=("settings",),
             type="tertiary",
@@ -600,19 +590,19 @@ def local_model_names(cfg: dict) -> list[str]:
 def start_run(cfg: dict) -> None:
     task = str(st.session_state.task or "").strip()
     if not task:
-        st.session_state.last_run = {"outcome": "failed", "error": "Опишите задачу — поле пустое."}
+        st.session_state.last_run = {"outcome": "failed", "error": t("run.empty_task")}
         return
     folder = workspace_dir()
     try:
         folder.mkdir(parents=True, exist_ok=True)
     except OSError as exc:
-        st.session_state.last_run = {"outcome": "failed", "error": f"Папка недоступна: {exc}"}
+        st.session_state.last_run = {"outcome": "failed", "error": t("run.folder_error", error=exc)}
         return
     local_names = local_model_names(cfg)
     if local_names:
         runtime = session_runtime()
         try:
-            with st.spinner("Запускаю локальную модель…"):
+            with st.spinner(t("run.starting_local")):
                 runtime.ensure_running()
                 for name in local_names:
                     runtime.warmup(name)
@@ -661,15 +651,19 @@ def render_progress() -> None:
                 if current.stopping:
                     status_line(
                         "live",
-                        "Останавливаю…",
-                        "прерываю команду; ответ модели, который уже ушёл, не жду",
+                        t("run.stopping"),
+                        t("run.stopping_detail"),
                     )
                 elif total:
-                    status_line("live", f"{name} работает", f"шаг {index} из {total} · {elapsed}")
+                    status_line(
+                        "live",
+                        t("run.working", name=name),
+                        t("run.step", index=index, total=total, elapsed=elapsed),
+                    )
                 else:
-                    status_line("live", "Запускаю…", elapsed)
+                    status_line("live", t("run.booting"), elapsed)
             action.button(
-                "Остановить",
+                t("run.stop"),
                 key="stop_run",
                 on_click=current.stop,
                 disabled=current.stopping,
@@ -712,41 +706,41 @@ def render_result() -> None:
     with st.container(key="result_panel"):
         detail = " · ".join(bit for bit in (last.get("when"), last.get("took")) if bit)
         if outcome == "ok":
-            status_line("ok", "Готово", detail)
+            status_line("ok", t("run.done"), detail)
         elif outcome == "stopped":
-            status_line("", "Остановлено", detail)
+            status_line("", t("run.stopped"), detail)
         else:
-            status_line("bad", "Не получилось", detail)
+            status_line("bad", t("run.failed"), detail)
         if last.get("error"):
             st.error(last["error"])
         if last.get("result"):
             st.markdown(last["result"])
         if last.get("traceback"):
-            with st.expander("Техническая подробность"):
+            with st.expander(t("run.technical")):
                 st.code(last["traceback"], language="text")
         if last.get("logs"):
-            with st.expander("Журнал"):
+            with st.expander(t("run.log")):
                 st.code("\n".join(last["logs"][-200:]), language="text")
         if last.get("report"):
             left, right, _rest = st.columns([1, 1, 2])
             left.download_button(
-                "Скачать отчёт",
+                t("run.download"),
                 data=last["report"],
                 file_name=last.get("file_name") or "run.md",
                 mime="text/markdown",
                 width="stretch",
             )
-            right.button("Открыть файлы", on_click=go, args=("files",), width="stretch")
+            right.button(t("run.open_files"), on_click=go, args=("files",), width="stretch")
 
 
 # ---------- agents ----------
 
 
 def render_agents(cfg: dict, catalog: dict, model_choices: list[str]) -> None:
-    page_head("Агенты", "Роли и модели", "У каждой роли своя модель. Изменения сохраняются сразу.")
+    page_head(t("agents.section"), t("agents.title"), t("agents.sub"))
     agents_cfg = cfg.get("agents") or {}
     if not agents_cfg:
-        empty("В config/agents.yaml нет ролей.")
+        empty(t("agents.empty"))
         return
     recommendations = cfg.get("recommendations") or {}
     overrides = st.session_state.agent_overrides
@@ -777,7 +771,7 @@ def render_agents(cfg: dict, catalog: dict, model_choices: list[str]) -> None:
                     if item in catalog
                 ]
                 st.selectbox(
-                    "Модель",
+                    t("agents.model"),
                     model_choices,
                     index=model_choices.index(current["model"]),
                     format_func=lambda item: str((catalog.get(item) or {}).get("name") or item),
@@ -785,7 +779,7 @@ def render_agents(cfg: dict, catalog: dict, model_choices: list[str]) -> None:
                     on_change=update,
                     args=(agent_id, "model", key),
                     label_visibility="collapsed",
-                    help=("Подходят: " + ", ".join(suggested)) if suggested else None,
+                    help=t("agents.suggested", names=", ".join(suggested)) if suggested else None,
                 )
                 meta = catalog.get(current["model"]) or {}
                 if meta:
@@ -796,7 +790,7 @@ def render_agents(cfg: dict, catalog: dict, model_choices: list[str]) -> None:
                     )
                 key = f"w_temp_{agent_id}"
                 st.slider(
-                    "Температура",
+                    t("agents.temperature"),
                     0.0,
                     1.0,
                     value=float(current["temperature"]),
@@ -804,7 +798,7 @@ def render_agents(cfg: dict, catalog: dict, model_choices: list[str]) -> None:
                     key=key,
                     on_change=update,
                     args=(agent_id, "temperature", key),
-                    help="Ниже — строже и предсказуемее, выше — свободнее.",
+                    help=t("agents.temperature_help"),
                 )
 
     def reset() -> None:
@@ -816,7 +810,7 @@ def render_agents(cfg: dict, catalog: dict, model_choices: list[str]) -> None:
                 st.session_state.pop(prefix + agent_id, None)
         persist()
 
-    st.button("Вернуть как было", type="tertiary", on_click=reset)
+    st.button(t("agents.reset"), type="tertiary", on_click=reset)
 
 
 # ---------- local models ----------
@@ -826,7 +820,7 @@ class _Transfer:
     def __init__(self, work) -> None:
         import threading
 
-        self.message = "Запускаю…"
+        self.message = t("run.booting")
         self.completed = 0
         self.total = 0
         self.error = ""
@@ -843,7 +837,7 @@ class _Transfer:
         self._cancel.set()
 
     def progress(self, status: str, completed: int, total: int) -> None:
-        self.message = status or "Скачиваю"
+        self.message = status or t("ollama.pulling")
         self.completed = completed
         self.total = total
 
@@ -857,13 +851,12 @@ class _Transfer:
             self.error = exc.message
             self.outcome = "failed"
         except Exception as exc:
-            self.error = str(exc) or "Не удалось скачать."
+            self.error = str(exc) or t("ollama.download_failed")
             self.outcome = "failed"
 
 
 def render_local() -> None:
     from core.local_runtime import (
-        MESSAGES,
         assess_fit,
         default_models_dir,
         format_bytes,
@@ -874,19 +867,19 @@ def render_local() -> None:
     runtime = session_runtime()
     probe = runtime.probe()
     page_head(
-        "Локальные модели",
-        "Ollama на этом компьютере",
-        "Веса и сама программа живут в папке Улья. Ключ API не нужен.",
+        t("local.section"),
+        t("local.title"),
+        t("local.sub"),
     )
     if probe.running:
-        who = "уже был запущен, Улей его не остановит" if probe.external else "запущен Ульем"
-        status_line("ok", "Ollama работает", who)
+        who = t("local.running_external") if probe.external else t("local.running_ours")
+        status_line("ok", t("local.running"), who)
     elif probe.error:
-        status_line("bad", "Ollama", MESSAGES.get(probe.error, probe.error))
+        status_line("bad", "Ollama", t(f"ollama.{probe.error}"))
     elif probe.binary:
-        status_line("live", "Ollama установлен", "сервер выключен — запустится вместе с ульем")
+        status_line("live", t("local.installed"), t("local.installed_detail"))
     else:
-        status_line("bad", "Ollama не установлен", "скачается без прав администратора")
+        status_line("bad", t("local.missing"), t("local.missing_detail"))
     if probe.gpu_note:
         st.caption(probe.gpu_note)
 
@@ -895,8 +888,12 @@ def render_local() -> None:
     free = runtime.disk_free()
     ram = runtime.ram_free()
     st.caption(
-        f"Папка весов: {models_path}. Свободно на диске {format_bytes(free)}"
-        + (f", памяти {format_bytes(ram)}." if ram is not None else ".")
+        t("local.disk_line", path=models_path, free=format_bytes(free))
+        + (
+            t("local.ram_suffix", ram=format_bytes(ram))
+            if ram is not None
+            else t("local.disk_only_end")
+        )
     )
 
     job = st.session_state.get("local_job")
@@ -912,8 +909,8 @@ def render_local() -> None:
             ratio = 0.0
             if current.total:
                 ratio = min(1.0, current.completed / current.total)
-            st.progress(ratio, text=current.message or "Скачиваю…")
-            st.button("Отменить", on_click=current.cancel, key="cancel_local")
+            st.progress(ratio, text=current.message or t("local.downloading"))
+            st.button(t("local.cancel"), on_click=current.cancel, key="cancel_local")
 
         live_transfer()
     elif job is not None and job.error:
@@ -921,14 +918,14 @@ def render_local() -> None:
 
     if not probe.running and not (job and job.running) and probe.error != "port_busy":
         if probe.binary:
-            if st.button("Запустить Ollama", type="primary"):
+            if st.button(t("local.start"), type="primary"):
                 try:
                     runtime.ensure_running()
                 except Exception as exc:
                     st.error(getattr(exc, "message", str(exc)))
                 else:
                     st.rerun()
-        elif st.button("Установить Ollama", type="primary"):
+        elif st.button(t("local.install"), type="primary"):
             try:
                 asset_name()
             except Exception as exc:
@@ -948,17 +945,17 @@ def render_local() -> None:
             installed = runtime.installed_models()
         except Exception as exc:
             st.error(str(exc))
-    st.subheader("Уже скачаны")
+    st.subheader(t("local.installed_heading"))
     if not installed:
-        empty("Пока пусто. Выберите модель ниже и нажмите «Установить».")
+        empty(t("local.none"))
     else:
         for model in installed:
             row, action = st.columns([4, 1], vertical_alignment="center")
             row.markdown(f"**{html.escape(model.name)}** · {format_bytes(model.size_bytes)}")
-            if action.button("Удалить", key=f"del_{model.name}"):
+            if action.button(t("local.delete"), key=f"del_{model.name}"):
                 try:
                     runtime.delete_model(model.name)
-                    st.toast(f"{model.name} удалена")
+                    st.toast(t("local.deleted", name=model.name))
                     st.rerun()
                 except Exception as exc:
                     st.error(str(exc))
@@ -976,8 +973,8 @@ def render_local() -> None:
 
         library = load_library(fetch=fetch, cache=cache)
         st.session_state.ollama_library = library
-    st.subheader("Каталог")
-    st.caption("Размеры ориентировочные. Список с ollama.com подмешивается, если сайт открылся.")
+    st.subheader(t("local.catalog"))
+    st.caption(t("local.catalog_hint"))
     for model in library:
         with st.container(border=True):
             st.markdown(f"**{html.escape(model.name)}**")
@@ -985,23 +982,23 @@ def render_local() -> None:
                 st.caption(model.summary)
             tags = [item.tag for item in model.tags] or ["latest"]
             tag = st.selectbox(
-                "Тег", tags, key=f"tag_{model.model_id}", label_visibility="collapsed"
+                t("local.tag"), tags, key=f"tag_{model.model_id}", label_visibility="collapsed"
             )
             chosen = next((item for item in model.tags if item.tag == tag), model.tags[0])
             fit = assess_fit(chosen.size_bytes, free, chosen.ram_bytes, ram)
             detail = format_bytes(chosen.size_bytes)
             if chosen.ram_bytes:
-                detail += f" · памяти около {format_bytes(chosen.ram_bytes)}"
+                detail += t("local.ram_about", size=format_bytes(chosen.ram_bytes))
             st.caption(detail)
             if fit.message:
                 st.warning(fit.message)
             allow = True
             if fit.disk_ok and not fit.ram_ok:
-                allow = st.checkbox("Всё равно скачать", key=f"anyway_{model.model_id}")
+                allow = st.checkbox(t("local.anyway"), key=f"anyway_{model.model_id}")
             reference = model.reference(tag)
             busy = bool(job and job.running)
             if st.button(
-                "Установить",
+                t("local.install_model"),
                 key=f"pull_{model.model_id}",
                 disabled=busy or not fit.disk_ok or not allow or not probe.running,
             ):
@@ -1012,10 +1009,10 @@ def render_local() -> None:
                 st.session_state.local_job = _Transfer(work)
                 st.rerun()
             if not probe.running:
-                st.caption("Сначала нужен запущенный Ollama.")
+                st.caption(t("local.need_server"))
 
-    with st.expander("Журнал Ollama"):
-        text = runtime.log_tail() or "Журнал появится, когда Улей сам запустит сервер."
+    with st.expander(t("local.log")):
+        text = runtime.log_tail() or t("local.log_empty")
         st.code(text, language="text")
 
 
@@ -1033,21 +1030,24 @@ def passes_billing(meta: dict, mode: str) -> bool:
 
 
 def render_models(catalog: dict) -> None:
-    page_head("Модели", "Каталог и цены")
+    page_head(t("models.section"), t("models.title"))
     verified = max((str(m.get("last_verified") or "") for m in catalog.values()), default="")
     st.markdown(
-        f'<p class="lead">Цены в долларах за 1M токенов, вход / выход. Сверено {html.escape(verified)}. '
-        "У Free tier показан платный тариф после бесплатной квоты.</p>",
+        f'<p class="lead">{html.escape(t("models.lead", date=verified))}</p>',
         unsafe_allow_html=True,
     )
     left, right = st.columns([2, 3], vertical_alignment="bottom")
     query = left.text_input(
-        "Поиск", placeholder="Название, провайдер или ID", label_visibility="collapsed"
+        t("models.search"), placeholder=t("models.search_placeholder"), label_visibility="collapsed"
     )
     choice = right.pills(
-        "Доступ", list(BILLING_FILTERS), default="Все", label_visibility="collapsed"
+        t("models.access"),
+        list(BILLING_FILTERS),
+        default="all",
+        format_func=lambda item: t(f"filter.{item}"),
+        label_visibility="collapsed",
     )
-    mode = BILLING_FILTERS.get(choice or "Все", "all")
+    mode = choice or "all"
     needle = query.strip().lower()
     matched = []
     for model_key, meta in catalog.items():
@@ -1060,7 +1060,7 @@ def render_models(catalog: dict) -> None:
             continue
         matched.append((model_key, meta))
     if not matched:
-        empty("Ничего не нашлось. Измените запрос или верните фильтр на «Все».")
+        empty(t("models.empty"))
         return
     rows = []
     for _key, meta in matched:
@@ -1069,21 +1069,35 @@ def render_models(catalog: dict) -> None:
             f"<td>{html.escape(str(meta.get('name')))}<br><small>{html.escape(str(meta.get('litellm')))}</small></td>"
             f"<td>{html.escape(str(meta.get('provider')))}</td>"
             f"<td>{badge(str(meta.get('billing') or ''))}</td>"
-            f'<td class="num">{html.escape(format_price(meta).replace(" за 1M", ""))}</td>'
+            f'<td class="num">{html.escape(format_price(meta).replace(t("price.suffix"), ""))}</td>'
             f'<td class="num">{html.escape(str(meta.get("context")))}</td>'
             "</tr>"
         )
     st.markdown(
         '<div class="sheet-wrap"><table class="sheet"><thead><tr>'
-        "<th>Модель</th><th>Провайдер</th><th>Доступ</th><th>Цена</th><th>Контекст</th>"
+        "<th>"
+        + "</th><th>".join(
+            html.escape(t(key))
+            for key in (
+                "models.col_model",
+                "models.col_provider",
+                "models.col_access",
+                "models.col_price",
+                "models.col_context",
+            )
+        )
+        + "</th>"
         f"</tr></thead><tbody>{''.join(rows)}</tbody></table></div>",
         unsafe_allow_html=True,
     )
-    st.caption(f"Показано {len(matched)} из {len(catalog)}.")
-    with st.expander("Подробности о модели"):
+    st.caption(t("models.shown", shown=len(matched), total=len(catalog)))
+    with st.expander(t("models.details")):
         labels = {model_key: str(meta.get("name")) for model_key, meta in matched}
         selected = st.selectbox(
-            "Модель", list(labels), format_func=labels.get, label_visibility="collapsed"
+            t("models.col_model"),
+            list(labels),
+            format_func=labels.get,
+            label_visibility="collapsed",
         )
         meta = catalog[selected]
         st.markdown(
@@ -1094,10 +1108,10 @@ def render_models(catalog: dict) -> None:
         st.markdown(meta.get("summary") or "")
         st.markdown(
             f"- **ID:** `{meta.get('litellm')}`\n"
-            f"- **Цена:** {format_price(meta)}. {meta.get('price_note')}\n"
-            f"- **Контекст:** {meta.get('context')}\n"
-            f"- **Для чего:** {meta.get('best_for')}\n"
-            f"- **Источник:** {meta.get('source')} · проверено {meta.get('last_verified')}"
+            f"- **{t('models.price_line')}:** {format_price(meta)}. {meta.get('price_note')}\n"
+            f"- **{t('models.context_line')}:** {meta.get('context')}\n"
+            f"- **{t('models.best_for')}:** {meta.get('best_for')}\n"
+            f"- **{t('models.source_line')}:** {meta.get('source')} · {t('models.checked', date=meta.get('last_verified'))}"
         )
 
 
@@ -1116,23 +1130,23 @@ def list_files(folder: Path) -> list[str]:
 
 
 def render_files() -> None:
-    page_head("Файлы", "Папка проекта")
+    page_head(t("files.section"), t("files.title"))
     folder = workspace_dir()
     st.markdown(f'<p class="lead">{html.escape(str(folder))}</p>', unsafe_allow_html=True)
     if not folder.is_dir():
-        empty("Папки ещё нет. Она появится после первого запуска.")
+        empty(t("files.missing"))
         return
     try:
         files = list_files(folder)
     except OSError as exc:
-        st.error(f"Не удалось прочитать папку: {exc}")
+        st.error(t("files.read_error", error=exc))
         return
     if not files:
-        empty("Папка пустая. Файлы появятся здесь, когда агенты их создадут.")
+        empty(t("files.empty"))
         return
-    chosen = st.selectbox("Файл", files, label_visibility="collapsed")
+    chosen = st.selectbox(t("files.file"), files, label_visibility="collapsed")
     if len(files) >= FILE_LIMIT:
-        st.caption(f"Показаны первые {FILE_LIMIT} файлов.")
+        st.caption(t("files.limit", n=FILE_LIMIT))
     from tools.filesystem import WorkspaceFS
 
     try:
@@ -1151,70 +1165,82 @@ def render_files() -> None:
 
 
 def render_settings() -> None:
-    page_head("Настройки", "Ключи и параметры")
+    page_head(t("settings.section"), t("settings.title"))
 
-    st.subheader("Оформление")
+    st.subheader(t("settings.appearance"))
 
     def set_palette() -> None:
         st.session_state.palette = resolve_palette(st.session_state.get("w_palette"))
         persist()
 
     st.segmented_control(
-        "Палитра",
+        t("settings.palette"),
         PALETTE_ORDER,
         default=resolve_palette(st.session_state.palette),
-        format_func=lambda item: PALETTE_LABELS[item],
+        format_func=lambda item: t(f"palette.{item}"),
         key="w_palette",
         on_change=set_palette,
-        help="«Графит» — тёмно-серые тона с ярким акцентом, «Тёплая» — исходные цвета студии.",
+        help=t("settings.palette_help"),
     )
 
-    st.subheader("Ключи API")
-    st.caption(
-        "Хватит одного. Ключи лежат в файле .env рядом с программой и никуда не отправляются, "
-        "кроме самого провайдера."
+    def set_language_choice() -> None:
+        st.session_state.language = st.session_state.get("w_language") or "auto"
+        set_language(st.session_state.language)
+        persist()
+
+    st.segmented_control(
+        t("settings.language"),
+        ("auto", "ru", "en"),
+        default=st.session_state.get("language") or "auto",
+        format_func=lambda item: t(f"lang.{item}"),
+        key="w_language",
+        on_change=set_language_choice,
+        help=t("settings.language_help"),
     )
+
+    st.subheader(t("settings.keys"))
+    st.caption(t("settings.keys_help"))
     keys = st.session_state.api_keys
     with st.form("keys_form", border=False):
         columns = st.columns(2)
         entered = {}
         for index, (label, env, hint) in enumerate(KEY_LABELS):
             entered[env] = columns[index % 2].text_input(
-                label, value=keys.get(env, ""), type="password", placeholder=hint
+                label, value=keys.get(env, ""), type="password", placeholder=t(hint)
             )
-        if st.form_submit_button("Сохранить ключи", type="primary"):
+        if st.form_submit_button(t("settings.save_keys"), type="primary"):
             st.session_state.api_keys = {env: value.strip() for env, value in entered.items()}
             save_keys_to_env(st.session_state.api_keys)
-            st.toast("Ключи сохранены")
+            st.toast(t("settings.keys_saved"))
             st.rerun()
 
-    st.subheader("Запуск")
+    st.subheader(t("settings.launch"))
     left, right = st.columns(2)
     with left:
         bound(
             st.slider,
-            "Шагов на одну роль",
+            t("settings.max_steps"),
             "max_steps",
             min_value=5,
             max_value=80,
-            help="Сколько раз роль может обратиться к модели за один запуск.",
+            help=t("settings.max_steps_help"),
         )
-        bound(st.toggle, "Не давать компьютеру уснуть", "keep_awake")
+        bound(st.toggle, t("settings.keep_awake"), "keep_awake")
     with right:
         bound(
             st.slider,
-            "Лимит на команду, сек",
+            t("settings.shell_timeout"),
             "shell_timeout",
             min_value=10,
             max_value=300,
-            help="Команда агента в терминале прерывается, если идёт дольше.",
+            help=t("settings.shell_timeout_help"),
         )
-        bound(st.toggle, "Держать экран включённым", "keep_display")
+        bound(st.toggle, t("settings.keep_display"), "keep_display")
     bound(
         st.text_input,
-        "Адрес Ollama",
+        t("settings.ollama_base"),
         "ollama_base",
-        help="Нужен только для локальных моделей. Обычно http://127.0.0.1:11434.",
+        help=t("settings.ollama_base_help"),
     )
     from core.local_runtime import default_models_dir
 
@@ -1222,32 +1248,32 @@ def render_settings() -> None:
     models_path = Path(custom).expanduser() if custom else default_models_dir()
     bound(
         st.text_input,
-        "Папка моделей Ollama",
+        t("settings.ollama_dir"),
         "ollama_models_dir",
-        help="Пусто — папка внутри данных Улья. Действует, когда Улей сам запускает Ollama.",
+        help=t("settings.ollama_dir_help"),
     )
-    st.caption(f"Сейчас веса лежат в {models_path}")
+    st.caption(t("settings.ollama_dir_now", path=models_path))
 
-    with st.expander("Проверить SSH-подключение"):
+    with st.expander(t("settings.ssh_check")):
         render_ssh()
-    with st.expander("Справка"):
+    with st.expander(t("settings.help")):
         render_help()
 
 
 def render_ssh() -> None:
-    st.caption("Команда выполнится на указанном компьютере. Вход по ключу, пароль не спрашивается.")
+    st.caption(t("ssh.caption"))
     with st.form("ssh_form", border=False):
         col1, col2 = st.columns(2)
-        host = col1.text_input("Хост", placeholder="192.168.1.10")
-        user = col2.text_input("Пользователь", value="pi")
-        key_path = col1.text_input("Путь к SSH-ключу", placeholder="~/.ssh/id_ed25519")
-        port = col2.number_input("Порт", value=22, min_value=1, max_value=65535)
-        command = st.text_input("Команда", value="uname -a")
-        submitted = st.form_submit_button("Выполнить")
+        host = col1.text_input(t("ssh.host"), placeholder="192.168.1.10")
+        user = col2.text_input(t("ssh.user"), value="pi")
+        key_path = col1.text_input(t("ssh.key"), placeholder="~/.ssh/id_ed25519")
+        port = col2.number_input(t("ssh.port"), value=22, min_value=1, max_value=65535)
+        command = st.text_input(t("ssh.command"), value="uname -a")
+        submitted = st.form_submit_button(t("ssh.run"))
     if not submitted:
         return
     if not host.strip() or not command.strip():
-        st.error("Нужны хост и команда.")
+        st.error(t("ssh.need_both"))
         return
     from tools.remote import RemoteDevice, RemoteManager
 
@@ -1261,41 +1287,13 @@ def render_ssh() -> None:
             key_path=str(Path(key_path).expanduser()) if key_path.strip() else None,
         )
     )
-    with st.spinner("Подключаюсь…"):
+    with st.spinner(t("ssh.connecting")):
         output = manager.run_ssh("check", command.strip())
     st.code(output, language="text")
 
 
 def render_help() -> None:
-    st.markdown(
-        """
-**С чего начать.** Получите бесплатный ключ в Google AI Studio или OpenRouter, вставьте его выше
-и сохраните. Затем откройте «Запуск», опишите задачу и нажмите «Запустить».
-
-**Локальные модели.** Откройте раздел «Локальные модели». Если Ollama ещё нет,
-Улей скачает его в свою папку без прав администратора. Уже запущенный на порту 11434
-не трогаем. Скачанные модели в «Агентах» называются «Ollama (локально)» и бесплатны.
-
-**Лицензия.** Ядро открыто на условиях GNU AGPL-3.0 (или более поздней версии).
-Коммерческие лицензии и «Улей Pro» — у автора, Bot2217. Вклад в код требует подписи CLA.
-
-**Где что лежит**
-
-| Что | Файл |
-| --- | --- |
-| Ключи | `.env` |
-| Выбранные модели, режим, папка, тема | `user_settings.json` |
-| Каталог моделей и цены | `config/models_catalog.yaml` |
-| Промпты ролей и режимы | `config/agents.yaml` |
-| Отчёты запусков | `results/` |
-| Копии файлов перед изменением | `backups/` |
-
-**Безопасность.** Файловые инструменты агентов не выходят из выбранной папки, перед перезаписью и
-удалением делается копия. Команды в терминале стартуют в этой папке, не видят ваших ключей API и
-проходят через список запрещённых шаблонов — но это страховка, а не песочница: запускайте агентов
-в папке, которую не жалко, и не давайте им задач от имени администратора.
-"""
-    )
+    st.markdown(t("help.body"))
 
 
 # ---------- entry ----------
@@ -1306,6 +1304,7 @@ def main() -> None:
     config_path = ROOT / "config" / "agents.yaml"
     cfg = load_config(config_path) if config_path.exists() else {}
     user_set = load_user_settings()
+    set_language(user_set.get("language", "auto"))
     catalog = load_models_catalog()
     try:
         from core.local_runtime import installed_catalog
@@ -1324,6 +1323,7 @@ def main() -> None:
         pass
     model_choices = sorted_model_keys(runnable_models(catalog)) or ["gemini_38_flash"]
     init_state(cfg, user_set, model_choices)
+    set_language(st.session_state.get("language", "auto"))
     st.session_state.model_catalog = catalog
     st.markdown(
         theme_stylesheet(st.session_state.theme, st.session_state.palette), unsafe_allow_html=True

@@ -12,6 +12,7 @@ import yaml
 from core.agent_runtime import AgentRuntime, RunStopped
 from core.catalog import KEY_ENV, api_base_for, load_models_catalog, provider_of
 from core.catalog import resolve_model as resolve_catalog_model
+from core.i18n import t
 
 ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_CONFIG = ROOT / "config" / "agents.yaml"
@@ -137,7 +138,7 @@ class Orchestrator:
 
             api_key = self._api_key_for_model(model_id)
             if not api_key:
-                msg = f"[SKIP {name}] нет API-ключа для модели {model_id}"
+                msg = t("orch.skip_key", name=name, model=model_id)
                 self.log(msg)
                 context_parts.append(msg)
                 reports.append(f"## {name}\n\n{msg}")
@@ -164,18 +165,18 @@ class Orchestrator:
                 result = runtime.run(task, context=ctx)
             except RunStopped:
                 self.outcome = "stopped"
-                self.log(f"[{name}] остановлено пользователем")
-                reports.append(f"## {name}\n\nОстановлено пользователем.")
+                self.log(t("orch.stopped_log", name=name))
+                reports.append(f"## {name}\n\n{t('orch.stopped_report')}")
                 break
             except Exception as exc:
                 # One failing role must not throw away what earlier roles produced.
                 self.outcome = "failed"
-                msg = f"[ОШИБКА {name}] {type(exc).__name__}: {exc}"
+                msg = t("orch.error", name=name, kind=type(exc).__name__, error=exc)
                 self.log(msg)
                 reports.append(f"## {name}\n\n{msg}")
                 break
             reports.append(f"## {name}\n\n{result}")
-            context_parts.append(f"Отчёт агента «{name}»:\n{handoff(result)}")
+            context_parts.append(t("orch.handoff", name=name, text=handoff(result)))
 
         header = f"# Pipeline: {self.pipeline_name}\n# Steps: {' → '.join(steps)}\n\n"
         return header + "\n\n---\n\n".join(reports)

@@ -8,6 +8,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
+from core.i18n import t
 from core.orchestrator import Orchestrator
 from tools.power import PowerManager
 
@@ -63,9 +64,9 @@ class RunJob:
 
     def report(self) -> str:
         return (
-            f"# Задача\n\n{self.task}\n\n# Журнал\n\n"
+            f"# {t('report.task')}\n\n{self.task}\n\n# {t('report.log')}\n\n"
             + "\n".join(self.logs)
-            + f"\n\n# Результат\n\n{self.result}"
+            + f"\n\n# {t('report.result')}\n\n{self.result}"
         )
 
     def _on_step(self, index: int, total: int, name: str) -> None:
@@ -99,5 +100,5 @@ class RunJob:
                 path.write_text(self.report(), encoding="utf-8")
                 self.report_path = path
             except OSError as exc:
-                self.log(f"Отчёт не сохранён: {exc}")
+                self.log(t("report.save_failed", error=exc))
             self.outcome = outcome

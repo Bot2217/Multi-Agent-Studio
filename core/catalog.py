@@ -11,6 +11,8 @@ from urllib.parse import urlparse
 
 import yaml
 
+from core.i18n import t
+
 ROOT = Path(__file__).resolve().parent.parent
 CATALOG_PATH = ROOT / "config" / "models_catalog.yaml"
 
@@ -126,7 +128,7 @@ def format_price(meta: dict[str, Any]) -> str:
     price_out = meta.get("price_output_per_1m")
     if price_in is None or price_out is None:
         return "unknown"
-    return f"${_num(price_in)} / ${_num(price_out)} за 1M"
+    return t("price.per_million", inn=_num(price_in), out=_num(price_out))
 
 
 def _num(value: Any) -> str:
@@ -300,7 +302,15 @@ def _is_price(value: Any) -> bool:
 
 def markdown_table(catalog: dict[str, dict[str, Any]]) -> str:
     header = (
-        "| Модель | Провайдер | ID | Доступ | Цена, USD / 1M in → out | Контекст | Проверено |\n"
+        "| {model} | {provider} | ID | {access} | {price} | {context} | {checked} |\n".format(
+            model=t("table.model"),
+            provider=t("table.provider"),
+            access=t("table.access"),
+            price=t("table.price"),
+            context=t("table.context"),
+            checked=t("table.checked"),
+        )
+        + "\n"
         "| --- | --- | --- | --- | --- | --- | --- |"
     )
     lines = [header]
