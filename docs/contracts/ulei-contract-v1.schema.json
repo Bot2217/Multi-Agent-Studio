@@ -369,6 +369,7 @@
           "enum": [
             "missing",
             "downloading",
+            "paused",
             "installed",
             "starting",
             "running",

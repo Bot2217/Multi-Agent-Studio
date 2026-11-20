@@ -103,7 +103,7 @@ class LocalModelStatus(BaseModel):
 
     version: Literal["1"] = "1"
     name: str
-    state: Literal["missing", "downloading", "installed", "starting", "running", "error"]
+    state: Literal["missing", "downloading", "paused", "installed", "starting", "running", "error"]
     progress: float | None = Field(default=None, ge=0, le=1)
     completed: int | None = None
     total: int | None = None

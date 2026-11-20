@@ -80,7 +80,7 @@ python -m contracts.export_schema
 }
 ```
 
-`state`: `missing`, `downloading`, `installed`, `starting`, `running`, `error`.
+`state`: `missing`, `downloading`, `paused`, `installed`, `starting`, `running`, `error`. `paused` — загрузка остановлена и её можно продолжить.
 
 ## События стрима
 

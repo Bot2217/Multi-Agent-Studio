@@ -11,9 +11,10 @@ from collections.abc import Callable
 
 from contracts.v1 import DoneEvent, ErrorEvent, LogEvent, StartEvent, StepEvent, Task
 from core.agent_runtime import AgentRuntime
-from core.catalog import api_base_for
+from core.catalog import api_base_for, provider_of
 from core.engine import AgentJob, AgentProblem, SwarmEngine, jobs_from_pipeline
 from core.i18n import t
+from core.local_runtime import LocalRuntimeError
 from core.orchestrator import Orchestrator, resolve_model
 
 Publish = Callable[[StartEvent | StepEvent | LogEvent | ErrorEvent | DoneEvent], None]
@@ -106,6 +107,7 @@ def engine_runner(
     *,
     api_keys: dict[str, str] | None = None,
     config: dict | None = None,
+    prepare_local=None,
 ) -> None:
     """HTTP path. Independent roles in one wave run at the same time."""
     hive = Orchestrator(
@@ -125,6 +127,14 @@ def engine_runner(
         return str(raw.get("name") or agent_id)
 
     jobs = jobs_from_pipeline(hive.cfg, task.pipeline, agent_title)
+    if _needs_ollama(hive, jobs):
+        start = prepare_local or _ensure_ollama
+        try:
+            start()
+        except LocalRuntimeError as exc:
+            publish(ErrorEvent(task_id=task.id, code=exc.code, message=exc.message))
+            publish(DoneEvent(task_id=task.id, outcome="failed", result=""))
+            return
 
     def execute(job: AgentJob, context: str, should_stop: Callable[[], bool]) -> str:
         raw = hive._agent_cfg(job.id)
@@ -166,3 +176,21 @@ def engine_runner(
         cancel,
         timeout_s,
     )
+
+
+def _resolved(hive: Orchestrator, job: AgentJob) -> str:
+    raw = hive._agent_cfg(job.id)
+    model_key = str(raw.get("model") or "")
+    if not model_key:
+        return ""
+    return resolve_model(hive.cfg, model_key, hive.catalog)
+
+
+def _needs_ollama(hive: Orchestrator, jobs: list[AgentJob]) -> bool:
+    return any(provider_of(_resolved(hive, job)) == "ollama" for job in jobs)
+
+
+def _ensure_ollama() -> None:
+    from core.ollama_runtime import OllamaRuntime
+
+    OllamaRuntime().ensure_running()
