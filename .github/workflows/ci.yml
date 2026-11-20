@@ -37,3 +37,6 @@ jobs:
       - name: Virtualenv can import Streamlit
         shell: cmd
         run: .venv\Scripts\python.exe -c "import streamlit; print(streamlit.__version__)"
+      - name: Installer lock stops only this copy of the sidecar
+        shell: cmd
+        run: powershell -NoProfile -ExecutionPolicy Bypass -File desktop\src-tauri\windows\install-lock.ps1 -SelfTest

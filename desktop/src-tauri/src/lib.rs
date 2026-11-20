@@ -153,6 +153,10 @@ fn spawn_backend(
         ])
         .set_process_group(true);
     let (mut rx, child) = sidecar.spawn().map_err(|err| err.to_string())?;
+    // If the window is killed outright, the job closes and takes the sidecar with it.
+    // Otherwise NSIS cannot replace ulei-backend.exe on the next install.
+    #[cfg(windows)]
+    attach_kill_on_job_close(child.pid());
     tauri::async_runtime::spawn(async move {
         while let Some(event) = rx.recv().await {
             match event {
@@ -191,8 +195,17 @@ fn offer_update(app: &tauri::AppHandle) {
         if !install {
             return;
         }
+        // The installer also stops this copy. Releasing the sidecar first
+        // avoids the NSIS "file is open for writing" dialog.
+        kill_backend(&handle);
         if update.download_and_install(|_, _| {}, || {}).await.is_ok() {
             handle.request_restart();
+        } else {
+            handle
+                .dialog()
+                .message(tr("desktop.update_failed"))
+                .title("Улей")
+                .blocking_show();
         }
     });
 }
@@ -241,8 +254,115 @@ fn kill_backend(app: &tauri::AppHandle) {
         return;
     };
     if let Some(child) = state.0.lock().ok().and_then(|mut slot| slot.take()) {
+        let pid = child.pid();
         let _ = child.kill();
+        wait_for_exit(pid, Duration::from_secs(5));
     }
+}
+
+#[cfg(windows)]
+fn wait_for_exit(pid: u32, timeout: Duration) {
+    const SYNCHRONIZE: u32 = 0x0010_0000;
+    unsafe {
+        let handle = OpenProcess(SYNCHRONIZE, 0, pid);
+        if handle.is_null() {
+            return;
+        }
+        let millis = u32::try_from(timeout.as_millis()).unwrap_or(u32::MAX);
+        WaitForSingleObject(handle, millis);
+        CloseHandle(handle);
+    }
+}
+
+#[cfg(not(windows))]
+fn wait_for_exit(_pid: u32, _timeout: Duration) {}
+
+#[cfg(windows)]
+fn attach_kill_on_job_close(pid: u32) {
+    const JOB_OBJECT_EXTENDED_LIMIT_INFORMATION: i32 = 9;
+    const JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE: u32 = 0x2000;
+    const PROCESS_SET_QUOTA: u32 = 0x0100;
+    const PROCESS_TERMINATE: u32 = 0x0001;
+
+    #[repr(C)]
+    struct BasicLimit {
+        per_process_user_time: i64,
+        per_job_user_time: i64,
+        limit_flags: u32,
+        minimum_working_set_size: usize,
+        maximum_working_set_size: usize,
+        active_process_limit: u32,
+        affinity: usize,
+        priority_class: u32,
+        scheduling_class: u32,
+    }
+    #[repr(C)]
+    struct ExtendedLimit {
+        basic: BasicLimit,
+        io_counters: [u64; 6],
+        process_memory: usize,
+        job_memory: usize,
+        peak_process_memory: usize,
+        peak_job_memory: usize,
+    }
+
+    unsafe {
+        let job = CreateJobObjectW(std::ptr::null_mut(), std::ptr::null());
+        if job.is_null() {
+            return;
+        }
+        let mut limits = std::mem::zeroed::<ExtendedLimit>();
+        limits.basic.limit_flags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
+        let set = SetInformationJobObject(
+            job,
+            JOB_OBJECT_EXTENDED_LIMIT_INFORMATION,
+            &limits as *const ExtendedLimit as *mut std::ffi::c_void,
+            std::mem::size_of::<ExtendedLimit>() as u32,
+        );
+        if set == 0 {
+            CloseHandle(job);
+            return;
+        }
+        let process = OpenProcess(PROCESS_SET_QUOTA | PROCESS_TERMINATE, 0, pid);
+        if process.is_null() {
+            CloseHandle(job);
+            return;
+        }
+        let assigned = AssignProcessToJobObject(job, process);
+        CloseHandle(process);
+        if assigned == 0 {
+            CloseHandle(job);
+            return;
+        }
+        // Keep the handle until this process exits. Closing it now would kill
+        // the sidecar immediately; process teardown closes it and the sidecar
+        // dies with this install instead of surviving as an orphan.
+        keep_job_handle(job);
+    }
+}
+
+#[cfg(windows)]
+fn keep_job_handle(job: *mut std::ffi::c_void) {
+    static JOBS: Mutex<Vec<usize>> = Mutex::new(Vec::new());
+    if let Ok(mut jobs) = JOBS.lock() {
+        jobs.push(job as usize);
+    }
+}
+
+#[cfg(windows)]
+#[link(name = "kernel32")]
+extern "system" {
+    fn CreateJobObjectW(attrs: *mut std::ffi::c_void, name: *const u16) -> *mut std::ffi::c_void;
+    fn SetInformationJobObject(
+        job: *mut std::ffi::c_void,
+        class: i32,
+        info: *mut std::ffi::c_void,
+        length: u32,
+    ) -> i32;
+    fn AssignProcessToJobObject(job: *mut std::ffi::c_void, process: *mut std::ffi::c_void) -> i32;
+    fn OpenProcess(access: u32, inherit: i32, pid: u32) -> *mut std::ffi::c_void;
+    fn WaitForSingleObject(handle: *mut std::ffi::c_void, millis: u32) -> u32;
+    fn CloseHandle(handle: *mut std::ffi::c_void) -> i32;
 }
 
 fn watch_signals(app: tauri::AppHandle) {

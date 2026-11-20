@@ -253,6 +253,7 @@
   "desktop.update_message": "An update is available. Install it and restart?",
   "desktop.update_install": "Install and restart",
   "desktop.update_later": "Later",
+  "desktop.update_failed": "The update was not installed. If the installer says ulei-backend.exe is in use, close Ulei completely and try again. Your settings and models are still there.",
   "desktop.start_failed": "Ulei could not start.",
   "desktop.no_answer": "Ulei did not answer. Close the window and start it again.",
   "desktop.engine_down": "The engine did not answer. The studio window will open without it.",

@@ -46,6 +46,9 @@
       "entitlements": "entitlements.plist"
     },
     "windows": {
+      "nsis": {
+        "installerHooks": "./windows/hooks.nsh"
+      },
       "wix": {
         "language": "ru-RU"
       }
