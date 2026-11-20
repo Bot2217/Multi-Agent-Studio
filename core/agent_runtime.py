@@ -67,7 +67,15 @@ class AgentRuntime:
         self.base_url = base_url
         self.temperature = temperature
         self.max_steps = max_steps
-        self.log = log_fn or (lambda s: None)
+        raw_log = log_fn or (lambda s: None)
+        secret = api_key or ""
+
+        def log(text: str) -> None:
+            from core.secrets import redact
+
+            raw_log(redact(str(text), [secret]))
+
+        self.log = log
         self.role_name = role_name
         self.should_stop = should_stop or (lambda: False)
         self.history: list[dict] = []
