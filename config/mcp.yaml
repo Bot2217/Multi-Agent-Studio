@@ -1,0 +1,3 @@
+# MCP servers an agent may use. Leave servers empty until you add one.
+# An agent opts in with mcp: [name] in config/agents.yaml.
+servers: {}
