@@ -15,6 +15,7 @@ from pydantic import BaseModel, Field
 from api.bus import EventBus
 from api.hive import TaskBook, list_agents, list_swarms, load_hive_config
 from api.runner import engine_runner
+from api.trust import LocalTrust
 from contracts.v1 import CONTRACT_VERSION, DoneEvent, ErrorEvent, LocalModelStatus, Task
 from core.ui_helpers import load_keys_from_env
 
@@ -105,6 +106,7 @@ def create_app(
     models: ModelSource | None = None,
     downloads=None,
     search=None,
+    token: str | None = None,
 ) -> FastAPI:
     cfg = config if config is not None else load_hive_config(config_path)
     engine = Engine(cfg, runner=runner, models=models)
@@ -116,12 +118,21 @@ def create_app(
     if search is None:
         search = _default_search
     app = FastAPI(title="Улей", version=CONTRACT_VERSION)
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=["*"],
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
+    if token:
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origin_regex=r"http://(127\.0\.0\.1|localhost|\[::1\])(:\d+)?",
+            allow_methods=["*"],
+            allow_headers=["Authorization", "Content-Type"],
+        )
+        app.add_middleware(LocalTrust, token=token)
+    else:
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=["*"],
+            allow_methods=["*"],
+            allow_headers=["*"],
+        )
     app.state.engine = engine
 
     @app.get("/api/v1/health")
