@@ -6,9 +6,15 @@ import json
 import os
 import socket
 import threading
+import time
+from contextlib import contextmanager
 
 from core.i18n import t
 from core.paths import data_root
+
+
+class ApiStartupError(RuntimeError):
+    """The engine thread died or never accepted a connection."""
 
 
 def _flag(argv: list[str], name: str) -> str:
@@ -53,7 +59,46 @@ def write_endpoint(port: str) -> None:
     )
 
 
-def serve_in_thread(port: str | None = None):
+def _silence_signals(server) -> None:
+    """Do not install signal handlers from the engine thread.
+
+    On Windows, uvicorn's handler registration raises NotImplementedError
+    when it runs on the main thread of a frozen app, and from a side thread
+    it can steal Ctrl+C from Streamlit. The desktop shell owns shutdown.
+    """
+
+    @contextmanager
+    def _noop():
+        yield
+
+    if hasattr(server, "capture_signals"):
+        server.capture_signals = _noop
+
+
+def wait_until_listening(
+    port: str, thread: threading.Thread, errors: list[BaseException], timeout: float
+) -> bool:
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if errors:
+            return False
+        if not thread.is_alive() and not _port_open(port):
+            return False
+        if _port_open(port):
+            return True
+        time.sleep(0.05)
+    return _port_open(port)
+
+
+def _port_open(port: str) -> bool:
+    try:
+        with socket.create_connection(("127.0.0.1", int(port)), timeout=0.2):
+            return True
+    except OSError:
+        return False
+
+
+def serve_in_thread(port: str | None = None, *, timeout: float = 30):
     """Start uvicorn on a daemon thread. Returns the server and the port."""
     import uvicorn
 
@@ -69,7 +114,20 @@ def serve_in_thread(port: str | None = None):
             access_log=False,
         )
     )
-    threading.Thread(target=server.run, name="ulei-api", daemon=True).start()
+    _silence_signals(server)
+    errors: list[BaseException] = []
+
+    def target() -> None:
+        try:
+            server.run()
+        except BaseException as exc:  # noqa: BLE001 — report and let Streamlit continue
+            errors.append(exc)
+
+    thread = threading.Thread(target=target, name="ulei-api", daemon=True)
+    thread.start()
+    if not wait_until_listening(chosen, thread, errors, timeout):
+        detail = errors[0] if errors else "timed out"
+        raise ApiStartupError(f"engine did not listen on 127.0.0.1:{chosen}: {detail}")
     write_endpoint(chosen)
     print(f"API_READY http://127.0.0.1:{chosen}", flush=True)
     return server, chosen
