@@ -28,6 +28,15 @@ pyinstaller --noconfirm --clean --onefile --name ulei-backend \
   --collect-submodules tools \
   --collect-submodules api \
   --collect-submodules contracts \
+  --hidden-import uvicorn.logging \
+  --hidden-import uvicorn.loops \
+  --hidden-import uvicorn.loops.auto \
+  --hidden-import uvicorn.protocols \
+  --hidden-import uvicorn.protocols.http.auto \
+  --hidden-import uvicorn.protocols.websockets.auto \
+  --hidden-import uvicorn.lifespan.on \
+  --hidden-import websockets \
+  --collect-all websockets \
   --add-data "app.py${SEP}." \
   --add-data "core${SEP}core" \
   --add-data "config${SEP}config" \

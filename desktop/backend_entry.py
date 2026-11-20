@@ -7,6 +7,9 @@ import sys
 
 
 def main() -> None:
+    import multiprocessing
+
+    multiprocessing.freeze_support()
     from api.serve import parse_ports
 
     port, api_port = parse_ports(sys.argv[1:])
