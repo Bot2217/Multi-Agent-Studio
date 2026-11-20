@@ -108,6 +108,7 @@ def engine_runner(
     api_keys: dict[str, str] | None = None,
     config: dict | None = None,
     prepare_local=None,
+    mcp_clients=None,
 ) -> None:
     """HTTP path. Independent roles in one wave run at the same time."""
     hive = Orchestrator(
@@ -151,6 +152,7 @@ def engine_runner(
             publish(LogEvent(task_id=task.id, agent_id=job.id, text=str(text)))
 
         tools = raw.get("tools")
+        extra_tools = _mcp_tools(raw, mcp_clients)
         runtime = AgentRuntime(
             workspace=task.workspace,
             backup_dir=task.workspace,
@@ -165,6 +167,7 @@ def engine_runner(
             allowed_tools=None if tools is None else list(tools),
             role_name=job.title,
             should_stop=should_stop,
+            extra_tools=extra_tools or None,
         )
         return runtime.run(task.text, context=context)
 
@@ -188,6 +191,18 @@ def _resolved(hive: Orchestrator, job: AgentJob) -> str:
 
 def _needs_ollama(hive: Orchestrator, jobs: list[AgentJob]) -> bool:
     return any(provider_of(_resolved(hive, job)) == "ollama" for job in jobs)
+
+
+def _mcp_tools(raw: dict, clients) -> dict:
+    if not clients:
+        return {}
+    from core.mcp_client import tool_callables
+
+    tools = {}
+    for name in raw.get("mcp") or []:
+        client = clients[str(name)]
+        tools.update(tool_callables(str(name), client))
+    return tools
 
 
 def _ensure_ollama() -> None:

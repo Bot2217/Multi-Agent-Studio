@@ -56,6 +56,7 @@ class AgentRuntime:
         allowed_tools: Optional[list[str]] = None,
         role_name: str = "agent",
         should_stop: Optional[Callable[[], bool]] = None,
+        extra_tools: Optional[dict[str, Callable]] = None,
     ):
         self.fs = WorkspaceFS(workspace, backup_dir)
         self.shell = ShellRunner(cwd=workspace, timeout=shell_timeout)
@@ -101,11 +102,13 @@ class AgentRuntime:
             "power_stop": lambda a: self.power.stop(),
             "finish": lambda a: a.get("summary", "Done"),
         }
+        if extra_tools:
+            all_tools.update(extra_tools)
 
         if allowed_tools is None:
             self._tools = all_tools
         else:
-            names = set(allowed_tools) | {"finish"}
+            names = set(allowed_tools) | {"finish"} | set((extra_tools or {}))
             self._tools = {k: v for k, v in all_tools.items() if k in names}
 
         tool_list = "\n".join(f"- {n}" for n in self._tools if n != "finish")
