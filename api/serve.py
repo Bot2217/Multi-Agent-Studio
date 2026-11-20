@@ -43,20 +43,16 @@ def free_port() -> str:
         return str(sock.getsockname()[1])
 
 
-def write_endpoint(port: str) -> None:
+def write_endpoint(port: str, token: str = "") -> None:
     path = data_root() / "api.json"
-    path.write_text(
-        json.dumps(
-            {
-                "port": int(port),
-                "health": f"http://127.0.0.1:{port}/api/v1/health",
-            },
-            ensure_ascii=False,
-            indent=2,
-        )
-        + "\n",
-        encoding="utf-8",
-    )
+    payload = {"port": int(port), "health": f"http://127.0.0.1:{port}/api/v1/health"}
+    if token:
+        payload["token"] = token
+    path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    try:
+        os.chmod(path, 0o600)
+    except OSError:
+        pass
 
 
 def _silence_signals(server) -> None:
@@ -100,14 +96,17 @@ def _port_open(port: str) -> bool:
 
 def serve_in_thread(port: str | None = None, *, timeout: float = 30):
     """Start uvicorn on a daemon thread. Returns the server and the port."""
+    import secrets
+
     import uvicorn
 
     from api.app import create_app
 
     chosen = port or free_port()
+    token = secrets.token_hex(32)
     server = uvicorn.Server(
         uvicorn.Config(
-            create_app(),
+            create_app(token=token),
             host="127.0.0.1",
             port=int(chosen),
             log_level="warning",
@@ -128,6 +127,6 @@ def serve_in_thread(port: str | None = None, *, timeout: float = 30):
     if not wait_until_listening(chosen, thread, errors, timeout):
         detail = errors[0] if errors else "timed out"
         raise ApiStartupError(f"engine did not listen on 127.0.0.1:{chosen}: {detail}")
-    write_endpoint(chosen)
+    write_endpoint(chosen, token)
     print(f"API_READY http://127.0.0.1:{chosen}", flush=True)
     return server, chosen

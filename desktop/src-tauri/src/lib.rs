@@ -96,6 +96,53 @@ fn probe(client: &reqwest::blocking::Client, url: &str) -> bool {
         .unwrap_or(false)
 }
 
+fn api_json_path() -> std::path::PathBuf {
+    if let Ok(dir) = std::env::var("MAS_DATA_DIR") {
+        return std::path::PathBuf::from(dir).join("api.json");
+    }
+    #[cfg(windows)]
+    {
+        let base = std::env::var("APPDATA").unwrap_or_else(|_| ".".into());
+        return std::path::PathBuf::from(base).join("ulei").join("api.json");
+    }
+    #[cfg(target_os = "macos")]
+    {
+        let home = std::env::var("HOME").unwrap_or_else(|_| ".".into());
+        return std::path::PathBuf::from(home)
+            .join("Library")
+            .join("Application Support")
+            .join("ulei")
+            .join("api.json");
+    }
+    #[cfg(all(unix, not(target_os = "macos")))]
+    {
+        let base = std::env::var("XDG_DATA_HOME").unwrap_or_else(|_| {
+            let home = std::env::var("HOME").unwrap_or_else(|_| ".".into());
+            format!("{home}/.local/share")
+        });
+        std::path::PathBuf::from(base).join("ulei").join("api.json")
+    }
+}
+
+fn engine_token() -> Option<String> {
+    let text = std::fs::read_to_string(api_json_path()).ok()?;
+    let value: serde_json::Value = serde_json::from_str(&text).ok()?;
+    let token = value.get("token")?.as_str()?.trim();
+    if token.is_empty() { None } else { Some(token.to_string()) }
+}
+
+fn probe_engine(client: &reqwest::blocking::Client, url: &str) -> bool {
+    let Some(token) = engine_token() else {
+        return false;
+    };
+    client
+        .get(url)
+        .header("authorization", format!("Bearer {token}"))
+        .send()
+        .map(|response| response.status().is_success())
+        .unwrap_or(false)
+}
+
 /// Streamlit health, then the engine health. The window still opens when the
 /// engine stays quiet, after a short extra wait.
 fn wait_until_ready(port: u16, api_port: u16) -> (bool, bool) {
@@ -115,7 +162,7 @@ fn wait_until_ready(port: u16, api_port: u16) -> (bool, bool) {
             page_ok = true;
             page_since = Some(tick);
         }
-        if !engine_ok && probe(&client, &engine) {
+        if !engine_ok && probe_engine(&client, &engine) {
             engine_ok = true;
         }
         if page_ok && engine_ok {
