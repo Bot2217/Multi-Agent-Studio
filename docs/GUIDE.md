@@ -31,11 +31,17 @@
 
 | Система | Файл |
 | --- | --- |
-| Windows | `Ulei_0.1.2_x64-setup.exe` и MSI |
-| macOS | `Ulei_0.1.2_aarch64.dmg` и архив обновления `.app.tar.gz` |
-| Linux | `Ulei_0.1.2_amd64.AppImage` и `.deb` |
+| Windows | `Ulei_0.1.3_x64-setup.exe` и MSI |
+| macOS | `Ulei_0.1.3_aarch64.dmg` и архив обновления `.app.tar.gz` |
+| Linux | `Ulei_0.1.3_amd64.AppImage` и `.deb` |
 
 Подпись кода не покупалась: macOS подписан ad-hoc (`codesign -`), без аккаунта Apple Developer. Windows SmartScreen пишет «неизвестный издатель»: «Подробнее», затем «Выполнить в любом случае». macOS может написать «Приложение «Улей.app» повреждено»: `xattr -cr "/Applications/Улей.app"` или правый клик → «Открыть».
+
+Если окно остаётся на «Запускаю улей…» или пишет, что фоновый процесс закрылся, откройте журнал sidecar. В нём есть строки `health` и `api` с адресами проверки: порты выбираются заново при каждом запуске.
+
+- Windows: `%LOCALAPPDATA%\ulei\logs\sidecar.log`
+- macOS: `~/Library/Logs/ulei/sidecar.log`
+- Linux: `~/.local/state/ulei/logs/sidecar.log` или `$XDG_STATE_HOME/ulei/logs/sidecar.log`
 
 Ключи, `user_settings.json`, папка `workspace`, отчёты и копии лежат в каталоге пользователя `ulei`:
 
@@ -66,8 +72,8 @@ npx tauri signer generate -w ~/.tauri/ulei.key
 Первый релиз: в `main` после слияния
 
 ```bash
-git tag v0.1.2
-git push origin v0.1.2
+git tag v0.1.3
+git push origin v0.1.3
 ```
 
 Workflow `release.yml` собирает три системы и кладёт черновик Release. Публичный ключ записан в `desktop/src-tauri/tauri.conf.json`. На теге workflow ещё раз подставляет секрет `TAURI_SIGNING_PUBLIC_KEY`, включает `createUpdaterArtifacts` и загружает `latest.json` вместе с подписями. Имена вложений задаёт шаблон `Ulei_[version]_[arch][setup][ext]`. Без секретов `TAURI_SIGNING_*` тег не собирается. Локальная сборка без приватного ключа по-прежнему делает установщики, но без подписи обновления.

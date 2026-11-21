@@ -18,7 +18,14 @@ esac
 if [[ "$(uname -s)" == "Darwin" ]]; then
   CODESIGN=(--codesign-identity - --osx-entitlements-file desktop/src-tauri/entitlements.plist)
 fi
+# backend_entry.py lives in desktop/, and PyInstaller searches only that
+# directory unless the repo root is on --paths. v0.1.2 therefore shipped a
+# sidecar whose module graph listed "missing module named api" and crashed
+# with ModuleNotFoundError before it listened. --paths . is what collects
+# api, contracts and the rest of this repo. The add-data copies keep the
+# same packages on disk if a later analysis pass skips a delayed import.
 pyinstaller --noconfirm --clean --onefile --name ulei-backend \
+  --paths . \
   --collect-all streamlit \
   --collect-all litellm \
   --collect-all fastapi \
@@ -37,7 +44,22 @@ pyinstaller --noconfirm --clean --onefile --name ulei-backend \
   --hidden-import uvicorn.lifespan.on \
   --hidden-import websockets \
   --collect-all websockets \
+  --hidden-import api \
+  --hidden-import api.serve \
+  --hidden-import api.app \
+  --hidden-import api.trust \
+  --hidden-import api.runner \
+  --hidden-import api.hive \
+  --hidden-import api.bus \
+  --hidden-import contracts \
+  --hidden-import contracts.v1 \
+  --hidden-import core \
+  --hidden-import core.paths \
+  --hidden-import core.startup_log \
+  --hidden-import yaml \
   --add-data "app.py${SEP}." \
+  --add-data "api${SEP}api" \
+  --add-data "contracts${SEP}contracts" \
   --add-data "core${SEP}core" \
   --add-data "config${SEP}config" \
   --add-data "tools${SEP}tools" \
@@ -45,6 +67,7 @@ pyinstaller --noconfirm --clean --onefile --name ulei-backend \
   --add-data "locales${SEP}locales" \
   ${CODESIGN[@]+"${CODESIGN[@]}"} \
   desktop/backend_entry.py
+python3 desktop/verify_bundle.py "dist/ulei-backend${EXT}"
 mkdir -p desktop/src-tauri/binaries
 SIDECAR="desktop/src-tauri/binaries/ulei-backend-${HOST}${EXT}"
 cp "dist/ulei-backend${EXT}" "$SIDECAR"

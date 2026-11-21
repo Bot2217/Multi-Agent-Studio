@@ -10,6 +10,8 @@ on:
       - "core/**"
       - "tools/**"
       - "config/**"
+      - "api/**"
+      - "contracts/**"
       - "requirements.txt"
       - ".github/workflows/release.yml"
 
@@ -32,6 +34,8 @@ jobs:
         run: bash desktop/ci-apt.sh
       - name: Freeze the Python sidecar
         run: bash desktop/build-backend.sh
+      - name: Frozen sidecar serves health outside the checkout
+        run: python3 desktop/smoke_sidecar.py
       - name: Install the desktop shell
         working-directory: desktop
         run: npm ci
@@ -55,6 +59,8 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - name: Freeze the Python sidecar
         run: bash desktop/build-backend.sh
+      - name: Frozen sidecar serves health outside the checkout
+        run: python3 desktop/smoke_sidecar.py
       - name: Install the desktop shell
         working-directory: desktop
         run: npm ci
@@ -65,6 +71,35 @@ jobs:
         run: npm run tauri build -- --bundles app
       - name: Verify the ad-hoc signature
         run: bash desktop/verify-macos-sign.sh
+
+  windows-sidecar:
+    if: github.event_name == 'pull_request'
+    runs-on: windows-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Freeze the Python sidecar
+        run: bash desktop/build-backend.sh
+      - name: Frozen sidecar serves health outside the checkout
+        run: python desktop/smoke_sidecar.py
+      - name: Install the desktop shell
+        working-directory: desktop
+        run: npm ci
+      - name: Build the NSIS installer
+        working-directory: desktop
+        run: npm run tauri build -- --bundles nsis
+      - name: Install into a folder with Cyrillic and a space, then require health
+        shell: pwsh
+        run: powershell -NoProfile -ExecutionPolicy Bypass -File desktop\windows\smoke-nsis.ps1
 
   release:
     if: startsWith(github.ref, 'refs/tags/v')
@@ -97,6 +132,8 @@ jobs:
         run: bash desktop/ci-apt.sh
       - name: Freeze the Python sidecar
         run: bash desktop/build-backend.sh
+      - name: Frozen sidecar serves health outside the checkout
+        run: python3 desktop/smoke_sidecar.py
       - name: Install the desktop shell
         working-directory: desktop
         run: npm ci
@@ -119,20 +156,17 @@ jobs:
           tagName: ${{ github.ref_name }}
           releaseName: Улей ${{ github.ref_name }}
           releaseBody: |
-            Обновление для установленной 0.1.1 приходит само: при запуске «Улей» предложит «Установить и перезапустить».
+            Обновление для установленной 0.1.2 приходит само: при запуске «Улей» предложит «Установить и перезапустить».
 
-            Установщик больше не встаёт с ошибкой «Error opening file for writing … ulei-backend.exe», если программа или её фоновый движок ещё запущены. Перед заменой файлов закрывается только эта копия: ulei.exe и ulei-backend.exe в папке установки. Если файл всё ещё занят, установка останавливается с объяснением и не оставляет программу наполовину. Настройки в %APPDATA%\ulei и локальные модели не удаляются.
+            0.1.2 после установки не открывала студию. Окно оставалось на «Запускаю улей…», потому что упакованный ulei-backend.exe сразу завершался: ModuleNotFoundError: No module named 'api'. Сборщик искал модули только в каталоге desktop и не клал пакет api в архив. 0.1.3 кладёт api и остальные пакеты репозитория в sidecar.
 
-            Что ещё изменилось с 0.1.1:
-            - Каталог локальных моделей: поиск, квантизация, проверка RAM/VRAM, пауза и отмена скачивания.
-            - Движок v2: независимые роли одной волны идут параллельно, есть таймаут и отмена.
-            - Рядом со Streamlit поднимается локальный API. Он слушает только 127.0.0.1 и требует одноразовый токен.
-            - Роль может подключить MCP-сервер по stdio или HTTP.
-            - Если системное хранилище паролей отвечает, ключи провайдеров уходят из .env туда.
+            Если фоновый процесс всё же закроется, заставка больше не крутится без конца. Окно показывает текст ошибки, последние строки вывода и путь к журналу, и предлагает «Повторить». Журнал Windows: %LOCALAPPDATA%\ulei\logs\sidecar.log. В нём записаны фактические адреса health; порт выбирается при запуске.
 
-            Это патч 0.1.2, не 0.2.0: песочница инструментов, проверка хешей Ollama, аудиты зависимостей и SBOM ещё не готовы.
+            Установщик по-прежнему перед заменой файлов закрывает только эту копию: ulei.exe и ulei-backend.exe в папке установки. Настройки в %APPDATA%\ulei и локальные модели не удаляются.
 
-            Файлы называются Ulei_: Windows `Ulei_0.1.2_x64-setup.exe` и MSI, macOS `Ulei_0.1.2_aarch64.dmg`, Linux `Ulei_0.1.2_amd64.AppImage` и deb. macOS подписан ad-hoc. Если Gatekeeper пишет «повреждено»: `xattr -cr "/Applications/Улей.app"` или правый клик → «Открыть».
+            Это патч 0.1.3, не 0.2.0: песочница инструментов, проверка хешей Ollama, аудиты зависимостей и SBOM ещё не готовы.
+
+            Файлы называются Ulei_: Windows `Ulei_0.1.3_x64-setup.exe` и MSI, macOS `Ulei_0.1.3_aarch64.dmg`, Linux `Ulei_0.1.3_amd64.AppImage` и deb. macOS подписан ad-hoc. Если Gatekeeper пишет «повреждено»: `xattr -cr "/Applications/Улей.app"` или правый клик → «Открыть».
           releaseDraft: true
           prerelease: false
           updaterJsonPreferNsis: true
@@ -143,3 +177,7 @@ jobs:
         env:
           REQUIRE_UPDATER_ARCHIVE: "1"
         run: bash desktop/verify-macos-sign.sh
+      - name: Install the Windows package and require sidecar health
+        if: matrix.os == 'windows-latest'
+        shell: pwsh
+        run: powershell -NoProfile -ExecutionPolicy Bypass -File desktop\windows\smoke-nsis.ps1
