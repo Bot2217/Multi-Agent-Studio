@@ -1,5 +1,6 @@
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Mutex;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use tauri::Manager;
 use tauri_plugin_dialog::{DialogExt, MessageDialogButtons};
@@ -8,6 +9,10 @@ use tauri_plugin_shell::ShellExt;
 use tauri_plugin_updater::UpdaterExt;
 
 struct Backend(Mutex<Option<CommandChild>>);
+
+static SIDECAR_EXITED: AtomicBool = AtomicBool::new(false);
+static SIDECAR_GENERATION: AtomicU64 = AtomicU64::new(0);
+static SIDECAR_OUTPUT: Mutex<String> = Mutex::new(String::new());
 
 const RU_JSON: &str = include_str!("../../../locales/ru.json");
 const EN_JSON: &str = include_str!("../../../locales/en.json");
@@ -143,8 +148,64 @@ fn probe_engine(client: &reqwest::blocking::Client, url: &str) -> bool {
         .unwrap_or(false)
 }
 
-/// Streamlit health, then the engine health. The window still opens when the
-/// engine stays quiet, after a short extra wait.
+fn sidecar_log_path() -> std::path::PathBuf {
+    #[cfg(windows)]
+    {
+        let base = std::env::var("LOCALAPPDATA").unwrap_or_else(|_| ".".into());
+        return std::path::PathBuf::from(base)
+            .join("ulei")
+            .join("logs")
+            .join("sidecar.log");
+    }
+    #[cfg(target_os = "macos")]
+    {
+        let home = std::env::var("HOME").unwrap_or_else(|_| ".".into());
+        return std::path::PathBuf::from(home)
+            .join("Library")
+            .join("Logs")
+            .join("ulei")
+            .join("sidecar.log");
+    }
+    #[cfg(all(unix, not(target_os = "macos")))]
+    {
+        let base = std::env::var("XDG_STATE_HOME").unwrap_or_else(|_| {
+            let home = std::env::var("HOME").unwrap_or_else(|_| ".".into());
+            format!("{home}/.local/state")
+        });
+        std::path::PathBuf::from(base)
+            .join("ulei")
+            .join("logs")
+            .join("sidecar.log")
+    }
+}
+
+fn append_sidecar_log(line: &str) {
+    let path = sidecar_log_path();
+    if let Some(parent) = path.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+    let mut file = match std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&path)
+    {
+        Ok(file) => file,
+        Err(_) => return,
+    };
+    use std::io::Write;
+    let _ = writeln!(file, "{line}");
+}
+
+fn fill_tr(key: &str, pairs: &[(&str, &str)]) -> String {
+    let mut text = tr(key);
+    for (name, value) in pairs {
+        text = text.replace(&format!("{{{name}}}"), value);
+    }
+    text
+}
+
+/// Streamlit health, then the engine health. Poll often, and stop as soon as
+/// the sidecar process has exited instead of leaving the splash up.
 fn wait_until_ready(port: u16, api_port: u16) -> (bool, bool) {
     let page = format!("http://127.0.0.1:{port}/_stcore/health");
     let engine = format!("http://127.0.0.1:{api_port}/api/v1/health");
@@ -154,13 +215,18 @@ fn wait_until_ready(port: u16, api_port: u16) -> (bool, bool) {
     else {
         return (false, false);
     };
+    let started = Instant::now();
     let mut page_ok = false;
     let mut engine_ok = false;
-    let mut page_since: Option<u32> = None;
-    for tick in 0..120u32 {
+    let mut page_at: Option<Instant> = None;
+    while started.elapsed() < Duration::from_secs(180) {
+        if SIDECAR_EXITED.load(Ordering::SeqCst) {
+            append_sidecar_log("shell: sidecar process exited before health");
+            return (false, false);
+        }
         if !page_ok && probe(&client, &page) {
             page_ok = true;
-            page_since = Some(tick);
+            page_at = Some(Instant::now());
         }
         if !engine_ok && probe_engine(&client, &engine) {
             engine_ok = true;
@@ -168,12 +234,56 @@ fn wait_until_ready(port: u16, api_port: u16) -> (bool, bool) {
         if page_ok && engine_ok {
             return (true, true);
         }
-        if page_ok && page_since.is_some_and(|start| tick.saturating_sub(start) >= 15) {
-            return (true, false);
+        if page_ok && page_at.is_some_and(|at| at.elapsed() >= Duration::from_secs(8)) {
+            return (true, engine_ok);
         }
-        std::thread::sleep(Duration::from_secs(1));
+        std::thread::sleep(Duration::from_millis(200));
     }
     (page_ok, engine_ok)
+}
+
+fn remember_sidecar_line(line: &str) {
+    let line = line.trim_end();
+    if line.is_empty() {
+        return;
+    }
+    append_sidecar_log(line);
+    if let Ok(mut buffer) = SIDECAR_OUTPUT.lock() {
+        if !buffer.is_empty() {
+            buffer.push('\n');
+        }
+        buffer.push_str(line);
+        const LIMIT: usize = 8000;
+        if buffer.len() > LIMIT {
+            let mut cut = buffer.len() - LIMIT;
+            while cut < buffer.len() && !buffer.is_char_boundary(cut) {
+                cut += 1;
+            }
+            buffer.drain(..cut);
+        }
+    }
+}
+
+fn sidecar_output() -> String {
+    let text = SIDECAR_OUTPUT
+        .lock()
+        .map(|buffer| buffer.clone())
+        .unwrap_or_default();
+    const LIMIT: usize = 1500;
+    if text.len() <= LIMIT {
+        return text;
+    }
+    let mut cut = text.len() - LIMIT;
+    while cut < text.len() && !text.is_char_boundary(cut) {
+        cut += 1;
+    }
+    text[cut..].to_string()
+}
+
+fn clear_sidecar_output() {
+    if let Ok(mut buffer) = SIDECAR_OUTPUT.lock() {
+        buffer.clear();
+    }
 }
 
 fn set_status(window: &tauri::WebviewWindow, text: &str) {
@@ -188,6 +298,13 @@ fn spawn_backend(
     port: u16,
     api_port: u16,
 ) -> Result<CommandChild, String> {
+    let generation = SIDECAR_GENERATION.fetch_add(1, Ordering::SeqCst) + 1;
+    SIDECAR_EXITED.store(false, Ordering::SeqCst);
+    clear_sidecar_output();
+    remember_sidecar_line(&format!(
+        "shell: spawn --port {port} --api-port {api_port} health http://127.0.0.1:{port}/_stcore/health api http://127.0.0.1:{api_port}/api/v1/health log {}",
+        sidecar_log_path().display()
+    ));
     let sidecar = app
         .shell()
         .sidecar("ulei-backend")
@@ -199,26 +316,88 @@ fn spawn_backend(
             &api_port.to_string(),
         ])
         .set_process_group(true);
-    let (mut rx, child) = sidecar.spawn().map_err(|err| err.to_string())?;
+    let (mut rx, child) = sidecar.spawn().map_err(|err| {
+        remember_sidecar_line(&format!("shell: spawn failed: {err}"));
+        err.to_string()
+    })?;
+    remember_sidecar_line(&format!("shell: spawned pid {}", child.pid()));
     // If the window is killed outright, the job closes and takes the sidecar with it.
     // Otherwise NSIS cannot replace ulei-backend.exe on the next install.
     #[cfg(windows)]
     attach_kill_on_job_close(child.pid());
     tauri::async_runtime::spawn(async move {
         while let Some(event) = rx.recv().await {
+            if SIDECAR_GENERATION.load(Ordering::SeqCst) != generation {
+                continue;
+            }
             match event {
                 CommandEvent::Stdout(line) | CommandEvent::Stderr(line) => {
-                    eprintln!("ulei-backend: {}", String::from_utf8_lossy(&line));
+                    let text = String::from_utf8_lossy(&line);
+                    eprintln!("ulei-backend: {text}");
+                    remember_sidecar_line(&text);
                 }
-                CommandEvent::Error(err) => eprintln!("ulei-backend error: {err}"),
+                CommandEvent::Error(err) => {
+                    eprintln!("ulei-backend error: {err}");
+                    remember_sidecar_line(&format!("shell: {err}"));
+                }
                 CommandEvent::Terminated(payload) => {
                     eprintln!("ulei-backend exited: {payload:?}");
+                    remember_sidecar_line(&format!("shell: exited {payload:?}"));
+                    SIDECAR_EXITED.store(true, Ordering::SeqCst);
                 }
                 _ => {}
             }
         }
     });
     Ok(child)
+}
+
+fn store_child(app: &tauri::AppHandle, child: CommandChild) {
+    if let Some(state) = app.try_state::<Backend>() {
+        if let Ok(mut slot) = state.0.lock() {
+            if let Some(previous) = slot.take() {
+                let _ = previous.kill();
+            }
+            *slot = Some(child);
+        }
+        return;
+    }
+    app.manage(Backend(Mutex::new(Some(child))));
+}
+
+fn ask_retry(app: &tauri::AppHandle) -> bool {
+    let path = sidecar_log_path().display().to_string();
+    let captured = sidecar_output();
+    let detail = if captured.trim().is_empty() {
+        tr("desktop.sidecar_no_output")
+    } else {
+        captured
+    };
+    if let Some(window) = app.get_webview_window("main") {
+        set_status(
+            &window,
+            &fill_tr("desktop.sidecar_status", &[("path", &path)]),
+        );
+    }
+    let text = fill_tr(
+        "desktop.sidecar_failed",
+        &[("path", &path), ("detail", &detail)],
+    );
+    let (tx, rx) = std::sync::mpsc::channel();
+    let handle = app.clone();
+    tauri::async_runtime::spawn(async move {
+        let retry = handle
+            .dialog()
+            .message(text)
+            .title("Улей")
+            .buttons(MessageDialogButtons::OkCancelCustom(
+                tr("desktop.retry"),
+                tr("desktop.close"),
+            ))
+            .blocking_show();
+        let _ = tx.send(retry);
+    });
+    rx.recv().unwrap_or(false)
 }
 
 fn offer_update(app: &tauri::AppHandle) {
@@ -258,42 +437,46 @@ fn offer_update(app: &tauri::AppHandle) {
 }
 
 fn boot(app: tauri::AppHandle) {
-    if let Some(window) = app.get_webview_window("main") {
-        set_status(&window, &tr("desktop.starting"));
-    }
-    let port = free_port();
-    let api_port = free_port();
-    let child = match spawn_backend(&app, port, api_port) {
-        Ok(child) => child,
-        Err(err) => {
-            eprintln!("sidecar: {err}");
-            if let Some(window) = app.get_webview_window("main") {
-                set_status(&window, &tr("desktop.start_failed"));
+    loop {
+        if let Some(window) = app.get_webview_window("main") {
+            set_status(&window, &tr("desktop.starting"));
+        }
+        let port = free_port();
+        let api_port = free_port();
+        let child = match spawn_backend(&app, port, api_port) {
+            Ok(child) => child,
+            Err(err) => {
+                eprintln!("sidecar: {err}");
+                if !ask_retry(&app) {
+                    break;
+                }
+                continue;
             }
-            return;
+        };
+        store_child(&app, child);
+        let (page_ok, engine_ok) = wait_until_ready(port, api_port);
+        if !page_ok {
+            if !ask_retry(&app) {
+                break;
+            }
+            kill_backend(&app);
+            continue;
         }
-    };
-    app.manage(Backend(Mutex::new(Some(child))));
-    let (page_ok, engine_ok) = wait_until_ready(port, api_port);
-    if !page_ok {
+        if !engine_ok {
+            eprintln!("engine healthcheck failed on {api_port}");
+            if let Some(window) = app.get_webview_window("main") {
+                set_status(&window, &tr("desktop.engine_down"));
+            }
+        }
         if let Some(window) = app.get_webview_window("main") {
-            set_status(&window, &tr("desktop.no_answer"));
+            let url = format!("http://127.0.0.1:{port}/");
+            if let Ok(parsed) = url.parse() {
+                let _ = window.navigate(parsed);
+            }
         }
-        return;
+        offer_update(&app);
+        break;
     }
-    if !engine_ok {
-        eprintln!("engine healthcheck failed on {api_port}");
-        if let Some(window) = app.get_webview_window("main") {
-            set_status(&window, &tr("desktop.engine_down"));
-        }
-    }
-    if let Some(window) = app.get_webview_window("main") {
-        let url = format!("http://127.0.0.1:{port}/");
-        if let Ok(parsed) = url.parse() {
-            let _ = window.navigate(parsed);
-        }
-    }
-    offer_update(&app);
 }
 
 fn kill_backend(app: &tauri::AppHandle) {
