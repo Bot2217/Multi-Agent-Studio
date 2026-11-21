@@ -25,6 +25,14 @@ def test_bundle_listing_requires_the_api_package():
     assert not verify.has_module(["core/paths.py"], "api.serve")
 
 
+def test_token_is_sought_in_the_macos_application_support_dir():
+    smoke = _load("smoke_sidecar", "desktop/smoke_sidecar.py")
+    home = Path("/tmp/ulei-home")
+    found = [str(path) for path in smoke.token_candidates(home)]
+    assert any(path.endswith("/Library/Application Support/ulei/api.json") for path in found)
+    assert any(path.endswith("/Roaming/ulei/api.json") for path in found)
+
+
 def test_smoke_rejects_the_missing_api_traceback():
     smoke = _load("smoke_sidecar", "desktop/smoke_sidecar.py")
     sample = "ModuleNotFoundError: No module named 'api'\n[PYI-1:ERROR] Failed to execute script"

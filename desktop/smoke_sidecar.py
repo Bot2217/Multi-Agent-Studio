@@ -28,6 +28,25 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def configure_stdio() -> None:
+    """Windows CI captures stdout as cp1252. A Cyrillic install path must not abort the smoke."""
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is None:
+            continue
+        try:
+            reconfigure(encoding="utf-8", errors="backslashreplace")
+        except (OSError, ValueError):
+            pass
+
+
+def emit(text: str) -> None:
+    try:
+        print(text, flush=True)
+    except UnicodeEncodeError:
+        print(text.encode("utf-8", "backslashreplace").decode("ascii"), flush=True)
+
+
 def missing_api(text: str) -> bool:
     return "No module named 'api'" in text or 'No module named "api"' in text
 
@@ -63,11 +82,17 @@ def http_ok(url: str, headers: dict[str, str] | None = None, timeout: float = 2)
         return False
 
 
-def wait_token(data_home: Path, deadline: float) -> str:
-    candidates = [
+def token_candidates(data_home: Path) -> list[Path]:
+    """Where api.json lands for the HOME / APPDATA / XDG values this smoke sets."""
+    return [
         data_home / "ulei" / "api.json",
         data_home / "Roaming" / "ulei" / "api.json",
+        data_home / "Library" / "Application Support" / "ulei" / "api.json",
     ]
+
+
+def wait_token(data_home: Path, deadline: float) -> str:
+    candidates = token_candidates(data_home)
     while time.monotonic() < deadline:
         for path in candidates:
             if not path.is_file():
@@ -113,6 +138,7 @@ def failure(what: str, proc: subprocess.Popen, log: Path, url: str) -> str:
 
 
 def main(argv: list[str] | None = None) -> int:
+    configure_stdio()
     parser = argparse.ArgumentParser()
     parser.add_argument("executable", nargs="?", type=Path)
     parser.add_argument("--in-place", action="store_true")
@@ -163,10 +189,7 @@ def main(argv: list[str] | None = None) -> int:
     env["XDG_CONFIG_HOME"] = str(data_home / "config")
 
     log = stage_parent / "smoke.log"
-    print(
-        f"SMOKE exe={executable} cwd={workdir} port={port} api={api_port} data={data_home}",
-        flush=True,
-    )
+    emit(f"SMOKE exe={executable} cwd={workdir} port={port} api={api_port} data={data_home}")
     popen_kwargs: dict = {}
     if os.name == "nt":
         popen_kwargs["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP
@@ -198,11 +221,14 @@ def main(argv: list[str] | None = None) -> int:
             if not page_ok:
                 print(failure("streamlit health", proc, log, page), file=sys.stderr)
                 return 1
-            token = wait_token(data_home, deadline)
+            # The engine writes api.json before Streamlit is healthy. Keep a
+            # little time for that file even when the page itself was slow.
+            token_deadline = max(deadline, time.monotonic() + 30)
+            token = wait_token(data_home, token_deadline)
             if not token:
                 print(failure("api.json token", proc, log, engine), file=sys.stderr)
                 return 1
-            while time.monotonic() < deadline:
+            while time.monotonic() < token_deadline:
                 if proc.poll() is not None:
                     break
                 if http_ok(engine, {"Authorization": f"Bearer {token}"}):
@@ -219,7 +245,7 @@ def main(argv: list[str] | None = None) -> int:
     if missing_api(text):
         print(failure("missing api module", proc, log, page), file=sys.stderr)
         return 1
-    print(f"SMOKE_OK {page} {engine}", flush=True)
+    emit(f"SMOKE_OK {page} {engine}")
     return 0
 
 
