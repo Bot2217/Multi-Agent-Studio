@@ -51,7 +51,10 @@ test("theme, locale and navigation", async ({ page }) => {
   await expect(page.locator("html")).toHaveAttribute("data-mode", "light");
   await page.getByLabel("Язык", { exact: true }).selectOption("en");
   await expect(page.locator("html")).toHaveAttribute("lang", "en");
-  await page.getByRole("button", { name: "Run", exact: true }).click();
+  await page
+    .getByRole("navigation")
+    .getByRole("button", { name: "Run", exact: true })
+    .click();
   await expect(
     page.getByRole("heading", { name: "Run", exact: true }),
   ).toBeFocused();

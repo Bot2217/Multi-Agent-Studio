@@ -122,3 +122,20 @@ export const McpLong: Story = {
   name: "Длинный список инструментов MCP",
   args: { initialScreen: "settings", mcpScenario: "long" },
 };
+
+export const RunNoKeys: Story = {
+  name: "Запуск без ключей",
+  args: { runAvailability: "no-key" },
+};
+export const RunPartialKeys: Story = {
+  name: "Ключи доступны части ролей",
+  args: { runAvailability: "partial" },
+};
+export const RunOffline: Story = {
+  name: "Запуск без сети",
+  args: { runAvailability: "offline" },
+};
+export const RunMissingFolder: Story = {
+  name: "Запуск без папки",
+  args: { filesScenario: "missing" },
+};

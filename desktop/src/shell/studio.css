@@ -567,3 +567,69 @@
   overflow-wrap: anywhere;
   text-align: start;
 }
+
+.studio-topbar-commands {
+  display: flex;
+  align-items: center;
+  gap: var(--ulei-space-12);
+}
+
+.studio-command {
+  display: grid;
+  gap: var(--ulei-space-12);
+  max-height: calc(100vh - 48px);
+  overflow: auto;
+}
+
+.studio-command h2 {
+  margin: 0;
+}
+.studio-command > button {
+  justify-self: end;
+}
+
+.studio-command-list {
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  overflow: auto;
+  max-height: 290px;
+}
+
+.studio-command-list button {
+  width: 100%;
+  justify-content: flex-start;
+  text-align: start;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 620px) {
+  .studio-topbar-commands > span {
+    display: none;
+  }
+}
+
+.studio-run-shortcuts {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ulei-space-12);
+}
+
+.studio-run-shortcuts button {
+  text-align: start;
+}
+
+.studio-run-warning {
+  display: grid;
+  gap: var(--ulei-space-12);
+  justify-items: start;
+  padding-block-end: var(--ulei-space-12);
+}
+
+.studio-role[data-unavailable] {
+  border: 1px dashed var(--ulei-color-muted);
+  border-radius: var(--ulei-radius-control);
+  margin-block: var(--ulei-space-8);
+  padding: var(--ulei-space-12);
+}

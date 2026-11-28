@@ -30,6 +30,7 @@ import {
   type FilesScenario,
 } from "./studio-sections";
 import { StudioSettings, type McpScenario } from "./studio-settings";
+import { StudioCommand } from "./studio-command";
 import "./studio.css";
 import "./studio-sections.css";
 import "./local-models.css";
@@ -52,6 +53,7 @@ export type StudioProps = {
   filesScenario?: FilesScenario;
   mcpScenario?: McpScenario;
   agentsEmpty?: boolean;
+  runAvailability?: "ready" | "no-key" | "partial" | "offline";
   initialLocale?: Locale;
   initialMode?: Mode;
   initialPalette?: Palette;
@@ -83,6 +85,7 @@ export function Studio({
   filesScenario,
   mcpScenario,
   agentsEmpty = false,
+  runAvailability = "ready",
   initialLocale = "ru",
   initialMode = "auto",
   initialPalette = "graphite",
@@ -114,6 +117,14 @@ export function Studio({
     ({ id, enabled }) =>
       enabled && modes[pipeline].agents.some((agent) => agent === id),
   );
+  function canRunRole(role: (typeof activeRoles)[number], index: number) {
+    return (
+      role.model.startsWith("ollama_chat/") ||
+      runAvailability === "ready" ||
+      (runAvailability === "partial" && index === 0)
+    );
+  }
+  const runnableRoles = activeRoles.filter(canRunRole);
   const stopButton = useRef<HTMLButtonElement>(null);
   const restoreFocus = useRef(false);
   const [connectionAttempt, setConnectionAttempt] = useState(false);
@@ -153,19 +164,20 @@ export function Studio({
   }, [running]);
 
   function navigate(target: Screen) {
+    if (target === screen && !onboarding) heading.current?.focus();
     setScreen(target);
     setOnboarding(false);
   }
 
   function startRun() {
     setValidation(true);
-    if (running || !task.trim() || !folder.trim() || !activeRoles.length)
+    if (running || !task.trim() || !folder.trim() || !runnableRoles.length)
       return;
     const text = task.trim();
     runId.current += 1;
     setProgress(emptyRun);
     setPendingFrames(
-      demoEvents(`demo-${runId.current}`, pipeline, activeRoles, t),
+      demoEvents(`demo-${runId.current}`, pipeline, runnableRoles, t),
     );
     setRecent((previous) =>
       [text, ...previous.filter((item) => item !== text)].slice(0, 5),
@@ -217,7 +229,32 @@ export function Studio({
 
       <div className="studio-main">
         <header className="studio-topbar">
-          <span>{t.previewLabel}</span>
+          <div className="studio-topbar-commands">
+            <span>{t.previewLabel}</span>
+            <StudioCommand
+              t={t}
+              disabled={updateOpen}
+              commands={[
+                ...screens.map(({ id, label }) => ({
+                  label: t[label],
+                  action: () => navigate(id),
+                })),
+                {
+                  label: t.themeToggle,
+                  action: () => setMode(mode === "dark" ? "light" : "dark"),
+                },
+                ...(!running
+                  ? recent.map((text) => ({
+                      label: `${t.recentSearch} · ${text}`,
+                      action: () => {
+                        setTask(text);
+                        navigate("run");
+                      },
+                    }))
+                  : []),
+              ]}
+            />
+          </div>
           <label className="studio-language">
             <span className="sr-only">{t.language}</span>
             <select
@@ -423,7 +460,7 @@ export function Studio({
                             key="run"
                             ref={runButton}
                             type="submit"
-                            disabled={!activeRoles.length}
+                            disabled={!runnableRoles.length}
                           >
                             <Play size={16} aria-hidden />
                             {t.runDemo}
@@ -445,8 +482,37 @@ export function Studio({
                     {!activeRoles.length && (
                       <p role="status">{t.noEnabledRoles}</p>
                     )}
+                    {activeRoles.length > runnableRoles.length && (
+                      <div className="studio-run-warning" role="status">
+                        <p>
+                          {runAvailability === "offline"
+                            ? t.offlineRun
+                            : runnableRoles.length
+                              ? t.partialKey
+                              : t.noKey}
+                        </p>
+                        <Button
+                          variant="secondary"
+                          onClick={() =>
+                            navigate(
+                              runAvailability === "offline"
+                                ? "local"
+                                : "settings",
+                            )
+                          }
+                        >
+                          {runAvailability === "offline"
+                            ? t.localScreen
+                            : t.addKey}
+                        </Button>
+                      </div>
+                    )}
                     {activeRoles.map((role, index) => (
-                      <div className="studio-role" key={role.id}>
+                      <div
+                        className="studio-role"
+                        key={role.id}
+                        data-unavailable={!canRunRole(role, index) || undefined}
+                      >
                         <span className="studio-role-icon">
                           {index === 0 ? (
                             <Bot size={24} aria-hidden />
@@ -461,10 +527,33 @@ export function Studio({
                               : role.name}
                           </strong>
                           <code>{role.model}</code>
+                          {!canRunRole(role, index) && <p>{t.noKeyRole}</p>}
                         </div>
                       </div>
                     ))}
                   </section>
+                  {!running && (
+                    <div className="studio-run-shortcuts">
+                      <Button
+                        variant="secondary"
+                        onClick={() => navigate("files")}
+                      >
+                        <FileText size={16} aria-hidden />
+                        {filesScenario === "missing"
+                          ? t.missingFolder
+                          : t.runFilesCount}
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        onClick={() => navigate("settings")}
+                      >
+                        <KeyRound size={16} aria-hidden />
+                        {runAvailability === "ready"
+                          ? t.runKeyReady
+                          : t.apiKeys}
+                      </Button>
+                    </div>
+                  )}
                   {progress.phase === "idle" ? (
                     <section
                       className="studio-card studio-result"
