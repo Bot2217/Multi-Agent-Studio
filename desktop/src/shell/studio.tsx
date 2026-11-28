@@ -22,7 +22,9 @@ import { getMessages, type Locale } from "../locales";
 import { emptyRun, receiveEvent } from "../contract/run-state";
 import { demoEvents, modes, type DemoMode } from "./demo-run";
 import { RunProgress } from "./run-timeline";
+import { LocalModels, type RuntimeScenario } from "./local-models";
 import "./studio.css";
+import "./local-models.css";
 
 const screens = [
   { id: "run", label: "runScreen", Icon: Play },
@@ -37,6 +39,8 @@ type Mode = "auto" | "light" | "dark";
 type Palette = "graphite" | "warm";
 
 export type StudioProps = {
+  initialScreen?: Screen;
+  localScenario?: RuntimeScenario;
   initialLocale?: Locale;
   initialMode?: Mode;
   initialPalette?: Palette;
@@ -63,6 +67,8 @@ function Brand({ name, subtitle }: { name: string; subtitle: string }) {
 }
 
 export function Studio({
+  initialScreen = "run",
+  localScenario,
   initialLocale = "ru",
   initialMode = "auto",
   initialPalette = "graphite",
@@ -73,7 +79,7 @@ export function Studio({
   const [locale, setLocale] = useState(initialLocale);
   const [mode, setMode] = useState(initialMode);
   const [palette, setPalette] = useState(initialPalette);
-  const [screen, setScreen] = useState<Screen>("run");
+  const [screen, setScreen] = useState<Screen>(initialScreen);
   const [onboarding, setOnboarding] = useState(initialOnboarding);
   const [path, setPath] = useState<"cloud" | "local" | null>(null);
   const [updateOpen, setUpdateOpen] = useState(updateAvailable);
@@ -470,6 +476,12 @@ export function Studio({
                     </section>
                   )}
                 </div>
+              ) : screen === "local" ? (
+                <LocalModels
+                  t={t}
+                  scenario={localScenario}
+                  onSettings={() => navigate("settings")}
+                />
               ) : screen === "settings" ? (
                 <section className="studio-card studio-settings">
                   <h2>{t.appearance}</h2>

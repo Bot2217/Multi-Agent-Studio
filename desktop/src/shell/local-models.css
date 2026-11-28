@@ -1,0 +1,113 @@
+.local-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--ulei-space-24);
+  align-items: start;
+}
+
+.local-grid > section {
+  display: grid;
+  gap: var(--ulei-space-16);
+}
+.local-runtime,
+.local-hardware,
+.local-log {
+  grid-column: 1 / -1;
+}
+.local-runtime-title,
+.local-model-detail,
+.local-hardware > div,
+.local-search {
+  display: flex;
+  gap: var(--ulei-space-12);
+  align-items: center;
+}
+.local-runtime-title h2 {
+  font-size: 20px;
+}
+.local-runtime-title p,
+.local-grid section > p,
+.local-log [role="log"] {
+  color: var(--ulei-color-muted);
+}
+.local-grid > .local-hardware {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.local-hardware > div {
+  flex-wrap: wrap;
+}
+.local-hardware strong {
+  margin-inline-start: auto;
+}
+.local-search {
+  padding: 0 var(--ulei-space-12);
+  border: 1px solid var(--ulei-color-muted);
+  border-radius: var(--ulei-radius-control);
+}
+.local-search input {
+  background: transparent;
+  color: var(--ulei-color-ink);
+  min-width: 0;
+  width: 100%;
+  min-height: 40px;
+  border: 0;
+}
+.local-search input::placeholder {
+  color: var(--ulei-color-muted);
+}
+.local-search:focus-within {
+  outline: 2px solid var(--ulei-color-accent);
+  outline-offset: 2px;
+}
+.local-actions {
+  display: grid;
+  gap: var(--ulei-space-8);
+  justify-items: start;
+}
+.local-model-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  max-height: 340px;
+  overflow: auto;
+}
+.local-model-list > li {
+  display: grid;
+  gap: var(--ulei-space-8);
+  padding: var(--ulei-space-16) var(--ulei-space-8);
+}
+.local-model-list > li + li {
+  border-top: 1px solid var(--ulei-color-line);
+}
+.local-model-list > li > button {
+  justify-self: start;
+}
+.local-model-detail {
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+.local-model-detail code {
+  font:
+    12px var(--ulei-font-mono),
+    monospace;
+  overflow-wrap: anywhere;
+}
+.local-progress {
+  display: grid;
+  gap: var(--ulei-space-8);
+  font-size: 12px;
+}
+.local-progress progress {
+  accent-color: var(--ulei-color-accent);
+  width: 100%;
+}
+@media (max-width: 800px) {
+  .local-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+@media (max-width: 460px) {
+  .local-grid > .local-hardware {
+    grid-template-columns: 1fr;
+  }
+}
