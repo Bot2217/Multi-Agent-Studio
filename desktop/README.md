@@ -25,3 +25,15 @@ npm run tauri build
 выполните `npx playwright install chromium`, затем `npm run test:foundation`.
 При необходимости задайте абсолютный путь в `ULEI_SCREENSHOTS`, чтобы сохранить
 снимки тем в обеих ширинах.
+
+Сдача этой работы согласована через Storybook без Figma.
+В группе «Улей / Студия» доступны оболочка, первый запуск, недоступный движок
+и обновление. В группе «Улей / События запуска» можно пошагово проиграть
+JSON из примеров контракта, неизвестный кадр и остановку.
+
+Типы контракта генерируются из корня репозитория следующей командой.
+Параметр unreachableDefinitions нужен для объявлений из секции $defs.
+
+```bash
+npx json-schema-to-typescript docs/contracts/ulei-contract-v1.schema.json --unreachableDefinitions -o desktop/src/contract/ulei-contract-v1.d.ts
+```

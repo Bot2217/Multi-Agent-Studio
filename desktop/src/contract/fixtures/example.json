@@ -1,0 +1,43 @@
+[
+  {
+    "version": "1",
+    "type": "start",
+    "task_id": "task_01",
+    "pipeline": "code_only",
+    "agents": [
+      "developer",
+      "reviewer"
+    ]
+  },
+  {
+    "version": "1",
+    "type": "step",
+    "task_id": "task_01",
+    "index": 1,
+    "total": 2,
+    "agent_id": "developer",
+    "title": "Разработчик"
+  },
+  {
+    "version": "1",
+    "type": "log",
+    "task_id": "task_01",
+    "agent_id": "developer",
+    "text": "пишу hello.py"
+  },
+  {
+    "version": "1",
+    "type": "error",
+    "task_id": "task_01",
+    "agent_id": "developer",
+    "code": "model_not_found",
+    "message": "Такой модели нет в библиотеке Ollama."
+  },
+  {
+    "version": "1",
+    "type": "done",
+    "task_id": "task_01",
+    "outcome": "ok",
+    "result": "hello.py печатает приветствие."
+  }
+]
