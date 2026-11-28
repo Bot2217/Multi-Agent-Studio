@@ -5,7 +5,6 @@ import {
   Check,
   ChevronRight,
   FileText,
-  Folder,
   KeyRound,
   Laptop,
   Play,
@@ -18,12 +17,21 @@ import { Button } from "../components/ui/button";
 import { Field } from "../components/ui/field";
 import { StatePanel } from "../components/ui/state-panel";
 import { Status } from "../components/ui/status";
-import { getMessages, type Locale } from "../locales";
+import { getMessages, type Locale, type Messages } from "../locales";
 import { emptyRun, receiveEvent } from "../contract/run-state";
 import { demoEvents, modes, type DemoMode } from "./demo-run";
 import { RunProgress } from "./run-timeline";
 import { LocalModels, type RuntimeScenario } from "./local-models";
+import {
+  AgentsScreen,
+  FilesScreen,
+  ModelsScreen,
+  roleDefaults,
+  type FilesScenario,
+} from "./studio-sections";
+import { StudioSettings, type McpScenario } from "./studio-settings";
 import "./studio.css";
+import "./studio-sections.css";
 import "./local-models.css";
 
 const screens = [
@@ -41,6 +49,9 @@ type Palette = "graphite" | "warm";
 export type StudioProps = {
   initialScreen?: Screen;
   localScenario?: RuntimeScenario;
+  filesScenario?: FilesScenario;
+  mcpScenario?: McpScenario;
+  agentsEmpty?: boolean;
   initialLocale?: Locale;
   initialMode?: Mode;
   initialPalette?: Palette;
@@ -69,6 +80,9 @@ function Brand({ name, subtitle }: { name: string; subtitle: string }) {
 export function Studio({
   initialScreen = "run",
   localScenario,
+  filesScenario,
+  mcpScenario,
+  agentsEmpty = false,
   initialLocale = "ru",
   initialMode = "auto",
   initialPalette = "graphite",
@@ -87,6 +101,7 @@ export function Studio({
   const [task, setTask] = useState("");
   const [folder, setFolder] = useState("~/work/demo");
   const [validation, setValidation] = useState(false);
+  const [roles, setRoles] = useState(() => (agentsEmpty ? [] : roleDefaults));
   const [pipeline, setPipeline] = useState<DemoMode>("code_only");
   const [progress, setProgress] = useState(emptyRun);
   const [pendingFrames, setPendingFrames] = useState<
@@ -95,6 +110,10 @@ export function Studio({
   const [recent, setRecent] = useState<string[]>([]);
   const runId = useRef(0);
   const running = pendingFrames.length > 0;
+  const activeRoles = roles.filter(
+    ({ id, enabled }) =>
+      enabled && modes[pipeline].agents.some((agent) => agent === id),
+  );
   const stopButton = useRef<HTMLButtonElement>(null);
   const restoreFocus = useRef(false);
   const [connectionAttempt, setConnectionAttempt] = useState(false);
@@ -140,11 +159,14 @@ export function Studio({
 
   function startRun() {
     setValidation(true);
-    if (running || !task.trim() || !folder.trim()) return;
+    if (running || !task.trim() || !folder.trim() || !activeRoles.length)
+      return;
     const text = task.trim();
     runId.current += 1;
     setProgress(emptyRun);
-    setPendingFrames(demoEvents(`demo-${runId.current}`, pipeline, t));
+    setPendingFrames(
+      demoEvents(`demo-${runId.current}`, pipeline, activeRoles, t),
+    );
     setRecent((previous) =>
       [text, ...previous.filter((item) => item !== text)].slice(0, 5),
     );
@@ -397,7 +419,12 @@ export function Studio({
                             {t.stop}
                           </Button>
                         ) : (
-                          <Button key="run" ref={runButton} type="submit">
+                          <Button
+                            key="run"
+                            ref={runButton}
+                            type="submit"
+                            disabled={!activeRoles.length}
+                          >
                             <Play size={16} aria-hidden />
                             {t.runDemo}
                           </Button>
@@ -415,8 +442,11 @@ export function Studio({
                         {t.configure}
                       </Button>
                     </div>
-                    {modes[pipeline].agents.map((agent, index) => (
-                      <div className="studio-role" key={agent}>
+                    {!activeRoles.length && (
+                      <p role="status">{t.noEnabledRoles}</p>
+                    )}
+                    {activeRoles.map((role, index) => (
+                      <div className="studio-role" key={role.id}>
                         <span className="studio-role-icon">
                           {index === 0 ? (
                             <Bot size={24} aria-hidden />
@@ -425,8 +455,12 @@ export function Studio({
                           )}
                         </span>
                         <div>
-                          <strong>{t[agent]}</strong>
-                          <code>gemini-2.5-flash</code>
+                          <strong>
+                            {role.id in t
+                              ? t[role.id as keyof Messages]
+                              : role.name}
+                          </strong>
+                          <code>{role.model}</code>
                         </div>
                       </div>
                     ))}
@@ -482,48 +516,44 @@ export function Studio({
                   scenario={localScenario}
                   onSettings={() => navigate("settings")}
                 />
-              ) : screen === "settings" ? (
-                <section className="studio-card studio-settings">
-                  <h2>{t.appearance}</h2>
-                  <label className="studio-select">
-                    {t.palette}
-                    <select
-                      aria-label={t.palette}
-                      value={palette}
-                      onChange={(event) =>
-                        setPalette(event.target.value as Palette)
-                      }
-                    >
-                      <option value="graphite">{t.graphite}</option>
-                      <option value="warm">{t.warm}</option>
-                    </select>
-                  </label>
-                  <Button
-                    variant="secondary"
-                    onClick={() => {
-                      setPath(null);
-                      setOnboarding(true);
-                    }}
-                  >
-                    {t.onboarding}
-                  </Button>
-                </section>
+              ) : screen === "agents" ? (
+                <AgentsScreen roles={roles} setRoles={setRoles} t={t} />
+              ) : screen === "models" ? (
+                <ModelsScreen t={t} />
+              ) : screen === "files" ? (
+                <FilesScreen t={t} folder={folder} scenario={filesScenario} />
               ) : (
-                <section className="studio-card">
-                  <StatePanel
-                    title={t.screenPending}
-                    description={t.screenPendingBody}
-                    action={
+                <StudioSettings
+                  t={t}
+                  mcpScenario={mcpScenario}
+                  appearance={
+                    <section className="studio-card studio-settings">
+                      <h2>{t.appearance}</h2>
+                      <label className="studio-select">
+                        {t.palette}
+                        <select
+                          aria-label={t.palette}
+                          value={palette}
+                          onChange={(event) =>
+                            setPalette(event.target.value as Palette)
+                          }
+                        >
+                          <option value="graphite">{t.graphite}</option>
+                          <option value="warm">{t.warm}</option>
+                        </select>
+                      </label>
                       <Button
                         variant="secondary"
-                        onClick={() => navigate("run")}
+                        onClick={() => {
+                          setPath(null);
+                          setOnboarding(true);
+                        }}
                       >
-                        <Folder size={16} aria-hidden />
-                        {t.runScreen}
+                        {t.onboarding}
                       </Button>
-                    }
-                  />
-                </section>
+                    </section>
+                  }
+                />
               )}
             </>
           )}

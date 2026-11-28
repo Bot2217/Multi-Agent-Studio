@@ -1,3 +1,4 @@
+import type { PreviewRole } from "./studio-sections";
 import type { RunEvent } from "../contract/run-state";
 import type { Messages } from "../locales";
 
@@ -16,10 +17,13 @@ export type DemoMode = keyof typeof modes;
 export function demoEvents(
   taskId: string,
   mode: DemoMode,
+  roles: PreviewRole[],
   t: Messages,
 ): RunEvent[] {
   const context = { version: "1" as const, task_id: taskId };
-  const agents = [...modes[mode].agents];
+  const agents = modes[mode].agents.filter((id) =>
+    roles.some((role) => role.id === id),
+  );
   return [
     { ...context, type: "start", pipeline: mode, agents },
     ...agents.flatMap((agent, index): RunEvent[] => [
