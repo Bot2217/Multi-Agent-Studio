@@ -82,5 +82,10 @@
   "runDemo": "Preview a run",
   "demoResult": "Example complete. Results and reports will appear here in the application.",
   "onboarding": "First run",
-  "keyNotice": "Google's free tier may use submitted text to improve its products."
+  "keyNotice": "Google's free tier may use submitted text to improve its products.",
+  "logLabel": "Log",
+  "technicalDetails": "Technical details",
+  "resultLabel": "Result",
+  "resetPreview": "Reset",
+  "nextEvent": "Next event"
 }

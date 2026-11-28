@@ -517,3 +517,14 @@
     grid-template-columns: 1fr;
   }
 }
+
+.studio-timeline-roles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--ulei-space-16);
+}
+.studio-timeline-roles > div { display: grid; gap: var(--ulei-space-12); }
+.studio-log { max-height: 240px; overflow: auto; padding: var(--ulei-space-16); background: var(--ulei-color-bg); border-radius: var(--ulei-radius-control); }
+.studio-log p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.studio-log code, .studio-result details code { font: 12px var(--ulei-font-mono), monospace; color: var(--ulei-color-muted); }
+.studio-run-result { white-space: pre-wrap; overflow-wrap: anywhere; }
