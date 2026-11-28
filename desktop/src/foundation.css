@@ -1,0 +1,114 @@
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css" layer(utilities);
+@import "./tokens.css";
+
+@theme inline {
+  --color-canvas: var(--ulei-color-bg);
+  --color-surface: var(--ulei-color-surface);
+  --color-raised: var(--ulei-color-raised);
+  --color-ink: var(--ulei-color-ink);
+  --color-muted: var(--ulei-color-muted);
+  --color-line: var(--ulei-color-line);
+  --color-accent: var(--ulei-color-accent);
+  --color-on-accent: var(--ulei-color-on-accent);
+  --color-danger: var(--ulei-color-danger);
+  --color-ok: var(--ulei-color-ok);
+  --font-sans: var(--ulei-font-ui), system-ui, sans-serif;
+  --font-mono: var(--ulei-font-mono), ui-monospace, monospace;
+  --radius-control: var(--ulei-radius-control);
+  --radius-metric: var(--ulei-radius-metric);
+  --radius-card: var(--ulei-radius-card);
+}
+
+.ulei-button,
+.ulei-field input {
+  box-sizing: border-box;
+  min-block-size: 40px;
+  border: 1px solid transparent;
+  font: inherit;
+}
+
+.ulei-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--ulei-space-8);
+  padding: 7px var(--ulei-space-12);
+  color: var(--ulei-color-ink);
+  font-weight: 600;
+  line-height: 1.35;
+  text-align: center;
+  cursor: pointer;
+  transition: background-color var(--ulei-motion-duration) var(--ulei-motion-ease);
+}
+
+.ulei-button svg, .ulei-status svg, .ulei-state > svg { flex: none; }
+
+.ulei-button[data-variant="primary"] {
+  background: var(--ulei-color-accent);
+  color: var(--ulei-color-on-accent);
+}
+
+.ulei-button[data-variant="secondary"] {
+  background: var(--ulei-color-raised);
+  border-color: var(--ulei-color-line);
+}
+
+.ulei-button[data-variant="quiet"],
+.ulei-button[data-variant="danger"] { background: transparent; }
+
+.ulei-button[data-variant="danger"] {
+  color: var(--ulei-color-danger);
+  border-color: currentColor;
+}
+
+.ulei-button:is([data-variant="quiet"], [data-variant="danger"]):hover:not(:disabled, [aria-disabled="true"]) {
+  background: var(--ulei-color-raised);
+}
+
+.ulei-button[data-variant="secondary"]:hover:not(:disabled, [aria-disabled="true"]) {
+  background: var(--ulei-color-bg);
+}
+
+.ulei-button[data-variant="primary"]:hover:not(:disabled, [aria-disabled="true"]) {
+  background: color-mix(in srgb, var(--ulei-color-accent) 94%, var(--ulei-color-on-accent));
+}
+
+.ulei-button:is(:disabled, [aria-disabled="true"]) {
+  background: var(--ulei-color-raised);
+  color: var(--ulei-color-muted);
+  border-color: transparent;
+  cursor: default;
+}
+
+.ulei-button:focus-visible,
+.ulei-field input:focus-visible {
+  outline: var(--ulei-focus-width) solid var(--ulei-color-accent);
+  outline-offset: var(--ulei-focus-offset);
+}
+
+.ulei-field {
+  display: grid;
+  gap: var(--ulei-space-8);
+  min-inline-size: 0;
+}
+
+.ulei-field label { font-weight: 600; }
+.ulei-field input {
+  width: 100%;
+  background: var(--ulei-color-bg);
+  border-color: var(--ulei-color-muted);
+  color: var(--ulei-color-ink);
+  padding: 7px var(--ulei-space-12);
+}
+.ulei-field input::placeholder { color: var(--ulei-color-muted); }
+.ulei-field input[aria-invalid="true"] { border-color: var(--ulei-color-danger); }
+.ulei-field p { margin: 0; font-size: .875rem; }
+
+.ulei-status { white-space: nowrap; }
+.ulei-state { min-inline-size: 0; overflow-wrap: anywhere; }
+.ulei-state p, .ulei-state h3 { margin: 0; }
+
+@media (prefers-reduced-motion: reduce) {
+  .ulei-button { transition: none; }
+}
