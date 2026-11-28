@@ -209,5 +209,13 @@
   "commandPalette": "Go to a section",
   "commandSearch": "Search sections",
   "themeToggle": "Switch theme",
-  "recentSearch": "Recent tasks"
+  "recentSearch": "Recent tasks",
+  "noKey": "No API key for any of the models.",
+  "addKey": "Add a key",
+  "missingFolder": "This folder does not exist yet. It will be created when you run.",
+  "partialKey": "Roles without a key will be skipped.",
+  "offlineRun": "No network. Choose a local model to run.",
+  "noKeyRole": "Key unavailable",
+  "runFilesCount": "3 files in the project folder",
+  "runKeyReady": "Keys available"
 }
