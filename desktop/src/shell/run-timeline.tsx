@@ -1,12 +1,44 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { Button } from "../components/ui/button";
 import { Status } from "../components/ui/status";
-import { emptyRun, receiveEvent } from "../contract/run-state";
+import { emptyRun, receiveEvent, type RunState } from "../contract/run-state";
 import type { Messages } from "../locales";
 
 export function RunTimeline({ frames, t }: { frames: unknown[]; t: Messages }) {
   const [cursor, setCursor] = useState(0);
   const state = frames.slice(0, cursor).reduce(receiveEvent, emptyRun);
+  return (
+    <RunProgress state={state} t={t}>
+      <div className="studio-actions">
+        <Button
+          variant="secondary"
+          disabled={cursor === 0}
+          onClick={() => setCursor(0)}
+        >
+          {t.resetPreview}
+        </Button>
+        <Button
+          disabled={cursor >= frames.length}
+          onClick={() => setCursor((value) => value + 1)}
+        >
+          {t.nextEvent}
+        </Button>
+      </div>
+    </RunProgress>
+  );
+}
+
+export function RunProgress({
+  state,
+  t,
+  children,
+  report,
+}: {
+  state: RunState;
+  t: Messages;
+  children?: ReactNode;
+  report?: string;
+}) {
   const label =
     state.phase === "ok"
       ? t.done
@@ -98,21 +130,17 @@ export function RunTimeline({ frames, t }: { frames: unknown[]; t: Messages }) {
           <p>{state.result}</p>
         </div>
       )}
-      <div className="studio-actions">
-        <Button
-          variant="secondary"
-          disabled={cursor === 0}
-          onClick={() => setCursor(0)}
-        >
-          {t.resetPreview}
+      {report && state.phase === "ok" && (
+        <Button asChild variant="secondary">
+          <a
+            href={`data:text/plain;charset=utf-8,${encodeURIComponent(report)}`}
+            download="ulei-report.txt"
+          >
+            {t.downloadReport}
+          </a>
         </Button>
-        <Button
-          disabled={cursor >= frames.length}
-          onClick={() => setCursor((value) => value + 1)}
-        >
-          {t.nextEvent}
-        </Button>
-      </div>
+      )}
+      {children}
     </section>
   );
 }

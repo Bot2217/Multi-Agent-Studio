@@ -69,11 +69,37 @@ test("update dismisses for this session", async ({ page }) => {
 test("capture studio screens", async ({ page }) => {
   const output = process.env.ULEI_SCREENSHOTS;
   test.skip(!output, "Screenshots require an output directory.");
-  await page.setViewportSize({ width: 1200, height: 800 });
-  for (const name of ["shell", "onboarding"]) {
-    await page.goto(preview(name));
-    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
-    await page.evaluate(() => document.fonts.ready);
-    await page.screenshot({ path: join(output!, `ulei-${name}-1200.png`) });
+  for (const width of [1200, 880]) {
+    await page.setViewportSize({ width, height: width === 1200 ? 800 : 640 });
+    for (const name of ["shell", "onboarding"]) {
+      await page.goto(preview(name));
+      await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+      await page.evaluate(() => document.fonts.ready);
+      await page.screenshot({
+        path: join(output!, `ulei-${name}-${width}.png`),
+      });
+    }
   }
+});
+
+test("selected mode streams its roles and produces a downloadable report", async ({
+  page,
+}) => {
+  await page.goto(preview("shell"));
+  await page.getByRole("combobox", { name: "Режим" }).selectOption("single");
+  await page.getByRole("button", { name: "Описать проект" }).click();
+  await page.getByRole("button", { name: "Посмотреть запуск" }).click();
+  await expect(page.getByRole("button", { name: "Остановить" })).toBeFocused();
+  await expect(page.getByRole("log")).toContainText(
+    "Демонстрационный шаг выполнен.",
+  );
+  await expect(page.getByRole("heading", { name: "Итог" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Недавние задачи" }),
+  ).toBeVisible();
+  const [download] = await Promise.all([
+    page.waitForEvent("download"),
+    page.getByRole("link", { name: "Скачать отчёт" }).click(),
+  ]);
+  expect(download.suggestedFilename()).toBe("ulei-report.txt");
 });

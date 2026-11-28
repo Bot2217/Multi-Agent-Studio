@@ -19,6 +19,9 @@ import { Field } from "../components/ui/field";
 import { StatePanel } from "../components/ui/state-panel";
 import { Status } from "../components/ui/status";
 import { getMessages, type Locale } from "../locales";
+import { emptyRun, receiveEvent } from "../contract/run-state";
+import { demoEvents, modes, type DemoMode } from "./demo-run";
+import { RunProgress } from "./run-timeline";
 import "./studio.css";
 
 const screens = [
@@ -78,9 +81,16 @@ export function Studio({
   const [task, setTask] = useState("");
   const [folder, setFolder] = useState("~/work/demo");
   const [validation, setValidation] = useState(false);
-  const [run, setRun] = useState<"idle" | "running" | "done" | "stopped">(
-    "idle",
-  );
+  const [pipeline, setPipeline] = useState<DemoMode>("code_only");
+  const [progress, setProgress] = useState(emptyRun);
+  const [pendingFrames, setPendingFrames] = useState<
+    ReturnType<typeof demoEvents>
+  >([]);
+  const [recent, setRecent] = useState<string[]>([]);
+  const runId = useRef(0);
+  const running = pendingFrames.length > 0;
+  const stopButton = useRef<HTMLButtonElement>(null);
+  const restoreFocus = useRef(false);
   const [connectionAttempt, setConnectionAttempt] = useState(false);
   const heading = useRef<HTMLHeadingElement>(null);
   const runButton = useRef<HTMLButtonElement>(null);
@@ -101,6 +111,22 @@ export function Studio({
     heading.current?.focus();
   }, [screen, onboarding]);
 
+  useEffect(() => {
+    const [frame, ...remaining] = pendingFrames;
+    if (!frame) return;
+    const timer = window.setTimeout(() => {
+      setProgress((current) => receiveEvent(current, frame));
+      setPendingFrames(remaining);
+    }, 450);
+    return () => window.clearTimeout(timer);
+  }, [pendingFrames]);
+
+  useEffect(() => {
+    if (!restoreFocus.current) return;
+    restoreFocus.current = false;
+    (running ? stopButton : runButton).current?.focus();
+  }, [running]);
+
   function navigate(target: Screen) {
     setScreen(target);
     setOnboarding(false);
@@ -108,7 +134,21 @@ export function Studio({
 
   function startRun() {
     setValidation(true);
-    if (task.trim() && folder.trim()) setRun("running");
+    if (running || !task.trim() || !folder.trim()) return;
+    const text = task.trim();
+    runId.current += 1;
+    setProgress(emptyRun);
+    setPendingFrames(demoEvents(`demo-${runId.current}`, pipeline, t));
+    setRecent((previous) =>
+      [text, ...previous.filter((item) => item !== text)].slice(0, 5),
+    );
+    restoreFocus.current = true;
+  }
+
+  function stopRun() {
+    restoreFocus.current = true;
+    setPendingFrames([]);
+    setProgress((current) => ({ ...current, phase: "stopped" }));
   }
 
   return (
@@ -268,7 +308,7 @@ export function Studio({
                       <textarea
                         id="studio-task"
                         value={task}
-                        disabled={run === "running"}
+                        disabled={running}
                         aria-invalid={(validation && !task.trim()) || undefined}
                         aria-describedby={
                           validation && !task.trim() ? "task-error" : undefined
@@ -281,7 +321,7 @@ export function Studio({
                             event.key === "Enter"
                           ) {
                             event.preventDefault();
-                            if (run !== "running") startRun();
+                            if (!running) startRun();
                           }
                         }}
                       />
@@ -291,26 +331,44 @@ export function Studio({
                         </p>
                       )}
                       {!task && (
-                        <Button
-                          variant="quiet"
-                          onClick={() => setTask(t.exampleTask)}
-                        >
-                          {t.exampleLabel}
-                          <ChevronRight size={16} aria-hidden />
-                        </Button>
+                        <div className="studio-examples">
+                          {(["example", "readme", "todo"] as const).map(
+                            (sample) => (
+                              <Button
+                                key={sample}
+                                variant="quiet"
+                                onClick={() => setTask(t[`${sample}Task`])}
+                              >
+                                {t[`${sample}Label`]}
+                                <ChevronRight size={16} aria-hidden />
+                              </Button>
+                            ),
+                          )}
+                        </div>
                       )}
                       <div className="studio-form-options">
                         <label className="studio-select">
                           {t.modeLabel}
-                          <select disabled={run === "running"}>
-                            <option>{t.quickMode}</option>
+                          <select
+                            aria-label={t.modeLabel}
+                            disabled={running}
+                            value={pipeline}
+                            onChange={(event) =>
+                              setPipeline(event.target.value as DemoMode)
+                            }
+                          >
+                            {(Object.keys(modes) as DemoMode[]).map((mode) => (
+                              <option key={mode} value={mode}>
+                                {t[modes[mode].label]}
+                              </option>
+                            ))}
                           </select>
                         </label>
                         <Field
                           label={t.projectFolder}
                           value={folder}
                           onChange={(event) => setFolder(event.target.value)}
-                          disabled={run === "running"}
+                          disabled={running}
                           error={
                             validation && !folder.trim()
                               ? t.folderError
@@ -322,14 +380,12 @@ export function Studio({
                         <span className="studio-shortcut">
                           ⌘ / Ctrl + Enter
                         </span>
-                        {run === "running" ? (
+                        {running ? (
                           <Button
                             key="stop"
+                            ref={stopButton}
                             variant="danger"
-                            onClick={(event) => {
-                              event.preventDefault();
-                              setRun("stopped");
-                            }}
+                            onClick={stopRun}
                           >
                             <Square size={16} aria-hidden />
                             {t.stop}
@@ -353,8 +409,8 @@ export function Studio({
                         {t.configure}
                       </Button>
                     </div>
-                    {[t.developer, t.reviewer].map((name, index) => (
-                      <div className="studio-role" key={name}>
+                    {modes[pipeline].agents.map((agent, index) => (
+                      <div className="studio-role" key={agent}>
                         <span className="studio-role-icon">
                           {index === 0 ? (
                             <Bot size={24} aria-hidden />
@@ -363,61 +419,56 @@ export function Studio({
                           )}
                         </span>
                         <div>
-                          <strong>{name}</strong>
+                          <strong>{t[agent]}</strong>
                           <code>gemini-2.5-flash</code>
                         </div>
-                        <Status
-                          tone={
-                            run === "running"
-                              ? "running"
-                              : run === "done"
-                                ? "done"
-                                : "idle"
-                          }
-                        >
-                          {run === "running"
-                            ? t.running
-                            : run === "done"
-                              ? t.done
-                              : t.idle}
-                        </Status>
                       </div>
                     ))}
                   </section>
-                  <section
-                    className="studio-card studio-result"
-                    aria-live="polite"
-                  >
-                    {run === "idle" ? (
-                      <StatePanel
-                        title={t.emptyTitle}
-                        description={t.emptyDescription}
-                      />
-                    ) : (
-                      <>
-                        <Status
-                          tone={
-                            run === "running"
-                              ? "running"
-                              : run === "done"
-                                ? "done"
-                                : "idle"
-                          }
-                        >
-                          {t[run]}
-                        </Status>
-                        <p>{run === "done" ? t.demoResult : task}</p>
-                        {run === "running" && (
-                          <Button
-                            variant="secondary"
-                            onClick={() => setRun("done")}
-                          >
-                            {t.done}
-                          </Button>
-                        )}
-                      </>
-                    )}
-                  </section>
+                  {progress.phase === "idle" ? (
+                    <section
+                      className="studio-card studio-result"
+                      aria-live="polite"
+                    >
+                      {running ? (
+                        <Status tone="running">{t.startingRun}</Status>
+                      ) : (
+                        <StatePanel
+                          title={t.emptyTitle}
+                          description={t.emptyDescription}
+                        />
+                      )}
+                    </section>
+                  ) : (
+                    <RunProgress
+                      state={progress}
+                      t={t}
+                      report={[
+                        recent[0],
+                        ...progress.logs.map(
+                          (log) => `${log.agent_id ?? ""} ${log.text}`,
+                        ),
+                        progress.result,
+                      ].join("\n")}
+                    />
+                  )}
+                  {!running && recent.length > 0 && (
+                    <section className="studio-card studio-result">
+                      <h2>{t.recentTasks}</h2>
+                      <ul className="studio-recent">
+                        {recent.map((text) => (
+                          <li key={text}>
+                            <Button
+                              variant="quiet"
+                              onClick={() => setTask(text)}
+                            >
+                              {text}
+                            </Button>
+                          </li>
+                        ))}
+                      </ul>
+                    </section>
+                  )}
                 </div>
               ) : screen === "settings" ? (
                 <section className="studio-card studio-settings">
