@@ -1,0 +1,72 @@
+.concept-page {
+  min-height: 100vh;
+  background: var(--ulei-color-bg);
+  color: var(--ulei-color-ink);
+}
+.concept-list {
+  display: grid;
+  gap: var(--ulei-space-8);
+  list-style: none;
+  margin: 0;
+  padding: 4px;
+  max-height: 420px;
+  overflow: auto;
+}
+.concept-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ulei-space-12);
+  padding: var(--ulei-space-12);
+  border: 1px solid var(--ulei-color-line);
+  border-radius: var(--ulei-radius-control);
+}
+.concept-row p {
+  margin: 0;
+  color: var(--ulei-color-muted);
+}
+.concept-row input {
+  width: 70px;
+  min-height: 36px;
+  margin-inline-start: 8px;
+  color: var(--ulei-color-ink);
+  background: var(--ulei-color-bg);
+  border: 1px solid var(--ulei-color-muted);
+  padding: 4px 8px;
+  border-radius: 8px;
+}
+.concept-board {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--ulei-space-16);
+  align-items: start;
+}
+.concept-role {
+  display: grid;
+  gap: var(--ulei-space-12);
+}
+.concept-role ul {
+  padding-inline-start: 20px;
+}
+.concept-role select {
+  min-height: 40px;
+  color: var(--ulei-color-ink);
+  background: var(--ulei-color-bg);
+  border: 1px solid var(--ulei-color-muted);
+  padding: 4px 8px;
+  border-radius: 8px;
+}
+.concept-page :is(button, input, select, summary):focus-visible {
+  outline: 2px solid var(--ulei-color-accent);
+  outline-offset: 2px;
+}
+.concept-page progress {
+  accent-color: var(--ulei-color-accent);
+  width: 100%;
+}
+@media (max-width: 680px) {
+  .concept-board {
+    grid-template-columns: 1fr;
+  }
+}
